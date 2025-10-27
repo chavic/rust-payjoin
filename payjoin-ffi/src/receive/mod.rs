@@ -3,20 +3,20 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 pub use error::{
-    InputContributionError, JsonReply, OutputSubstitutionError, ProtocolError, PsbtInputError,
-    ReceiverError, SelectionError, SessionError,
+    AddressParseError, InputContributionError, JsonReply, OutputSubstitutionError, ProtocolError,
+    PsbtInputError, ReceiverBuilderError, ReceiverError, SelectionError, SessionError,
 };
 use payjoin::bitcoin::consensus::Decodable;
 use payjoin::bitcoin::psbt::Psbt;
 use payjoin::bitcoin::{Amount, FeeRate};
 use payjoin::persist::{MaybeFatalTransition, NextStateTransition};
 
-use crate::bitcoin_ffi::{Address, OutPoint, Script, TxOut};
+use crate::bitcoin_ffi::{OutPoint, Script, TxOut};
 use crate::error::ForeignError;
 pub use crate::error::{ImplementationError, SerdeJsonError};
 use crate::ohttp::OhttpKeys;
 use crate::receive::error::{ReceiverPersistedError, ReceiverReplayError};
-use crate::uri::error::{FeeRateError, IntoUrlError};
+use crate::uri::error::FeeRateError;
 use crate::{ClientResponse, OutputSubstitution, Request};
 
 pub mod error;
@@ -233,17 +233,20 @@ impl ReceiverBuilder {
     /// - [BIP 77: Payjoin Version 2: Serverless Payjoin](https://github.com/bitcoin/bips/blob/master/bip-0077.md)
     #[uniffi::constructor]
     pub fn new(
-        address: Arc<Address>,
+        address: String,
         directory: String,
         ohttp_keys: Arc<OhttpKeys>,
-    ) -> Result<Self, IntoUrlError> {
+    ) -> Result<Self, ReceiverBuilderError> {
+        let parsed_address = payjoin::bitcoin::Address::from_str(address.as_str())
+            .map_err(ReceiverBuilderError::from)?
+            .assume_checked();
         Ok(Self(
             payjoin::receive::v2::ReceiverBuilder::new(
-                Arc::unwrap_or_clone(address).into(),
+                parsed_address,
                 directory,
                 Arc::unwrap_or_clone(ohttp_keys).into(),
             )
-            .map_err(IntoUrlError::from)?,
+            .map_err(ReceiverBuilderError::from)?,
         ))
     }
 
