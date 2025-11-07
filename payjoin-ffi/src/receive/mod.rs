@@ -11,7 +11,6 @@ use payjoin::bitcoin::psbt::Psbt;
 use payjoin::bitcoin::{Amount, FeeRate};
 use payjoin::persist::{MaybeFatalTransition, NextStateTransition};
 
-use crate::bitcoin_ffi::OutPoint;
 use crate::error::ForeignError;
 pub use crate::error::{ImplementationError, SerdeJsonError};
 use crate::ohttp::OhttpKeys;
@@ -235,6 +234,21 @@ impl From<PlainTxOut> for payjoin::bitcoin::TxOut {
             value: Amount::from_sat(value.value_sat),
             script_pubkey: payjoin::bitcoin::ScriptBuf::from_bytes(value.script_pubkey),
         }
+    }
+}
+
+/// Primitive representation of an outpoint for the FFI boundary.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+pub struct PlainOutPoint {
+    /// Hex-encoded txid (big-endian).
+    pub txid: String,
+    /// Output index.
+    pub vout: u32,
+}
+
+impl From<payjoin::bitcoin::OutPoint> for PlainOutPoint {
+    fn from(value: payjoin::bitcoin::OutPoint) -> Self {
+        PlainOutPoint { txid: value.txid.to_string(), vout: value.vout }
     }
 }
 
@@ -593,7 +607,7 @@ impl_save_for_transition!(MaybeInputsSeenTransition, OutputsUnknown);
 
 #[uniffi::export(with_foreign)]
 pub trait IsOutputKnown: Send + Sync {
-    fn callback(&self, outpoint: OutPoint) -> Result<bool, ForeignError>;
+    fn callback(&self, outpoint: PlainOutPoint) -> Result<bool, ForeignError>;
 }
 
 #[uniffi::export]
@@ -605,7 +619,7 @@ impl MaybeInputsSeen {
         MaybeInputsSeenTransition(Arc::new(RwLock::new(Some(
             self.0.clone().check_no_inputs_seen_before(&mut |outpoint| {
                 is_known
-                    .callback((*outpoint).into())
+                    .callback(PlainOutPoint::from(*outpoint))
                     .map_err(|e| ImplementationError::new(e).into())
             }),
         ))))
@@ -976,14 +990,14 @@ impl_save_for_transition!(PayjoinProposalTransition, Monitor);
 
 #[uniffi::export]
 impl PayjoinProposal {
-    pub fn utxos_to_be_locked(&self) -> Vec<OutPoint> {
-        let mut outpoints: Vec<OutPoint> = Vec::new();
+    pub fn utxos_to_be_locked(&self) -> Vec<PlainOutPoint> {
+        let mut outpoints: Vec<PlainOutPoint> = Vec::new();
         for o in <PayjoinProposal as Into<
             payjoin::receive::v2::Receiver<payjoin::receive::v2::PayjoinProposal>,
         >>::into(self.clone())
         .utxos_to_be_locked()
         {
-            outpoints.push((*o).into());
+            outpoints.push(PlainOutPoint::from(*o));
         }
         outpoints
     }
@@ -1106,7 +1120,7 @@ pub trait TransactionExists: Send + Sync {
 
 #[uniffi::export(with_foreign)]
 pub trait OutpointSpent: Send + Sync {
-    fn callback(&self, outpoint: OutPoint) -> Result<bool, ForeignError>;
+    fn callback(&self, outpoint: PlainOutPoint) -> Result<bool, ForeignError>;
 }
 
 #[allow(clippy::type_complexity)]
@@ -1173,7 +1187,7 @@ impl Monitor {
             },
             |outpoint| {
                 outpoint_spent
-                    .callback(outpoint.into())
+                    .callback(PlainOutPoint::from(outpoint))
                     .map_err(|e| ImplementationError::new(e).into())
             },
         )))))
