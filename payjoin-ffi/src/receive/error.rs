@@ -188,6 +188,23 @@ pub struct InputContributionError(#[from] receive::InputContributionError);
 #[error(transparent)]
 pub struct PsbtInputError(#[from] receive::PsbtInputError);
 
+/// Error constructing an [`InputPair`](crate::InputPair).
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum InputPairError {
+    /// Provided outpoint could not be parsed.
+    #[error("Invalid outpoint (txid={txid}, vout={vout})")]
+    InvalidOutPoint { txid: String, vout: u32 },
+    /// PSBT input failed validation in the core library.
+    #[error("Invalid PSBT input: {0}")]
+    InvalidPsbtInput(Arc<PsbtInputError>),
+}
+
+impl InputPairError {
+    pub fn invalid_outpoint(txid: String, vout: u32) -> Self {
+        InputPairError::InvalidOutPoint { txid, vout }
+    }
+}
+
 /// Error that may occur when a receiver event log is replayed
 #[derive(Debug, thiserror::Error, uniffi::Object)]
 #[error(transparent)]
