@@ -11,7 +11,7 @@ use payjoin::bitcoin::psbt::Psbt;
 use payjoin::bitcoin::{Amount, FeeRate};
 use payjoin::persist::{MaybeFatalTransition, NextStateTransition};
 
-use crate::bitcoin_ffi::{OutPoint, Script, TxOut};
+use crate::bitcoin_ffi::OutPoint;
 use crate::error::ForeignError;
 pub use crate::error::{ImplementationError, SerdeJsonError};
 use crate::ohttp::OhttpKeys;
@@ -219,6 +219,24 @@ impl InitialReceiveTransition {
 
 #[derive(Clone, Debug, uniffi::Object)]
 pub struct ReceiverBuilder(payjoin::receive::v2::ReceiverBuilder);
+
+/// Primitive representation of a transaction output for the FFI boundary.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+pub struct PlainTxOut {
+    /// Amount in satoshis.
+    pub value_sat: u64,
+    /// Raw scriptPubKey bytes.
+    pub script_pubkey: Vec<u8>,
+}
+
+impl From<PlainTxOut> for payjoin::bitcoin::TxOut {
+    fn from(value: PlainTxOut) -> Self {
+        payjoin::bitcoin::TxOut {
+            value: Amount::from_sat(value.value_sat),
+            script_pubkey: payjoin::bitcoin::ScriptBuf::from_bytes(value.script_pubkey),
+        }
+    }
+}
 
 #[uniffi::export]
 impl ReceiverBuilder {
@@ -675,25 +693,27 @@ impl WantsOutputs {
 
     pub fn replace_receiver_outputs(
         &self,
-        replacement_outputs: Vec<TxOut>,
-        drain_script: &Script,
+        replacement_outputs: Vec<PlainTxOut>,
+        drain_script_pubkey: Vec<u8>,
     ) -> Result<WantsOutputs, OutputSubstitutionError> {
         let replacement_outputs: Vec<payjoin::bitcoin::TxOut> =
-            replacement_outputs.iter().map(|o| o.clone().into()).collect();
+            replacement_outputs.into_iter().map(Into::into).collect();
+        let drain_script = payjoin::bitcoin::ScriptBuf::from_bytes(drain_script_pubkey);
         self.0
             .clone()
-            .replace_receiver_outputs(replacement_outputs, &drain_script.0)
+            .replace_receiver_outputs(replacement_outputs, &drain_script)
             .map(Into::into)
             .map_err(Into::into)
     }
 
     pub fn substitute_receiver_script(
         &self,
-        output_script: &Script,
+        output_script_pubkey: Vec<u8>,
     ) -> Result<WantsOutputs, OutputSubstitutionError> {
+        let output_script = payjoin::bitcoin::ScriptBuf::from_bytes(output_script_pubkey);
         self.0
             .clone()
-            .substitute_receiver_script(&output_script.0)
+            .substitute_receiver_script(&output_script)
             .map(Into::into)
             .map_err(Into::into)
     }
