@@ -3,8 +3,9 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 pub use error::{
-    AddressParseError, InputContributionError, JsonReply, OutputSubstitutionError, ProtocolError,
-    PsbtInputError, ReceiverBuilderError, ReceiverError, SelectionError, SessionError,
+    AddressParseError, InputContributionError, InputPairError, JsonReply, OutputSubstitutionError,
+    ProtocolError, PsbtInputError, ReceiverBuilderError, ReceiverError, SelectionError,
+    SessionError,
 };
 use payjoin::bitcoin::consensus::Decodable;
 use payjoin::bitcoin::psbt::Psbt;
@@ -237,6 +238,36 @@ impl From<PlainTxOut> for payjoin::bitcoin::TxOut {
     }
 }
 
+impl From<payjoin::bitcoin::TxOut> for PlainTxOut {
+    fn from(value: payjoin::bitcoin::TxOut) -> Self {
+        PlainTxOut {
+            value_sat: value.value.to_sat(),
+            script_pubkey: value.script_pubkey.into_bytes(),
+        }
+    }
+}
+
+/// Primitive representation of a transaction input for the FFI boundary.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+pub struct PlainTxIn {
+    pub previous_output: PlainOutPoint,
+    pub script_sig: Vec<u8>,
+    pub sequence: u32,
+    pub witness: Vec<Vec<u8>>,
+}
+
+impl PlainTxIn {
+    fn into_core(self) -> Result<payjoin::bitcoin::TxIn, InputPairError> {
+        let previous_output = self.previous_output.into_core()?;
+        Ok(payjoin::bitcoin::TxIn {
+            previous_output,
+            script_sig: payjoin::bitcoin::ScriptBuf::from_bytes(self.script_sig),
+            sequence: payjoin::bitcoin::Sequence(self.sequence),
+            witness: self.witness.into(),
+        })
+    }
+}
+
 /// Primitive representation of an outpoint for the FFI boundary.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
 pub struct PlainOutPoint {
@@ -250,6 +281,47 @@ impl From<payjoin::bitcoin::OutPoint> for PlainOutPoint {
     fn from(value: payjoin::bitcoin::OutPoint) -> Self {
         PlainOutPoint { txid: value.txid.to_string(), vout: value.vout }
     }
+}
+
+impl PlainOutPoint {
+    fn into_core(self) -> Result<payjoin::bitcoin::OutPoint, InputPairError> {
+        let txid = payjoin::bitcoin::Txid::from_str(&self.txid)
+            .map_err(|_| InputPairError::invalid_outpoint(self.txid, self.vout))?;
+        Ok(payjoin::bitcoin::OutPoint { txid, vout: self.vout })
+    }
+}
+
+/// Primitive representation of a PSBT input for the FFI boundary.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+pub struct PlainPsbtInput {
+    pub witness_utxo: Option<PlainTxOut>,
+    pub redeem_script: Option<Vec<u8>>,
+    pub witness_script: Option<Vec<u8>>,
+}
+
+impl PlainPsbtInput {
+    fn into_core(self) -> payjoin::bitcoin::psbt::Input {
+        payjoin::bitcoin::psbt::Input {
+            witness_utxo: self.witness_utxo.map(Into::into),
+            redeem_script: self.redeem_script.map(payjoin::bitcoin::ScriptBuf::from_bytes),
+            witness_script: self.witness_script.map(payjoin::bitcoin::ScriptBuf::from_bytes),
+            ..Default::default()
+        }
+    }
+}
+
+/// Primitive representation of a weight measurement.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+pub struct PlainWeight {
+    pub weight_units: u64,
+}
+
+impl From<PlainWeight> for payjoin::bitcoin::Weight {
+    fn from(value: PlainWeight) -> Self { payjoin::bitcoin::Weight::from_wu(value.weight_units) }
+}
+
+impl From<payjoin::bitcoin::Weight> for PlainWeight {
+    fn from(value: payjoin::bitcoin::Weight) -> Self { PlainWeight { weight_units: value.to_wu() } }
 }
 
 #[uniffi::export]
@@ -813,15 +885,16 @@ pub struct InputPair(payjoin::receive::InputPair);
 impl InputPair {
     #[uniffi::constructor]
     pub fn new(
-        txin: bitcoin_ffi::TxIn,
-        psbtin: crate::bitcoin_ffi::PsbtInput,
-        expected_weight: Option<crate::bitcoin_ffi::Weight>,
-    ) -> Result<Self, PsbtInputError> {
-        Ok(Self(payjoin::receive::InputPair::new(
-            txin.into(),
-            psbtin.into(),
-            expected_weight.map(|w| w.into()),
-        )?))
+        txin: PlainTxIn,
+        psbtin: PlainPsbtInput,
+        expected_weight: Option<PlainWeight>,
+    ) -> Result<Self, InputPairError> {
+        let txin = txin.into_core()?;
+        let psbtin = psbtin.into_core();
+        let expected_weight = expected_weight.map(Into::into);
+        payjoin::receive::InputPair::new(txin, psbtin, expected_weight)
+            .map(Self)
+            .map_err(|err| InputPairError::InvalidPsbtInput(Arc::new(err.into())))
     }
 }
 
