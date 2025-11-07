@@ -1021,7 +1021,7 @@ impl ProvisionalProposal {
         ))))
     }
 
-    pub fn psbt_to_sign(&self) -> bitcoin_ffi::Psbt { self.0.clone().psbt_to_sign().into() }
+    pub fn psbt_to_sign(&self) -> String { self.0.clone().psbt_to_sign().to_string() }
 }
 
 #[derive(Clone, uniffi::Object)]
