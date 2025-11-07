@@ -367,9 +367,9 @@ impl ReceiverBuilder {
         &self,
         max_effective_fee_rate_sat_per_vb: u64,
     ) -> Result<Self, FeeRateError> {
-        let fee_rate = bitcoin_ffi::FeeRate::from_sat_per_vb(max_effective_fee_rate_sat_per_vb)
-            .map_err(FeeRateError::from)?;
-        Ok(Self(self.0.clone().with_max_fee_rate(fee_rate.into())))
+        let fee_rate = FeeRate::from_sat_per_vb(max_effective_fee_rate_sat_per_vb)
+            .ok_or_else(|| FeeRateError::overflow(max_effective_fee_rate_sat_per_vb))?;
+        Ok(Self(self.0.clone().with_max_fee_rate(fee_rate)))
     }
 
     pub fn build(&self) -> InitialReceiveTransition {
