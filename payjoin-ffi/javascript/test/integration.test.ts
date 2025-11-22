@@ -129,7 +129,7 @@ class ProcessPsbtCallback implements payjoin.ProcessPsbt {
 }
 
 function createReceiverContext(
-    address: bitcoin.Address,
+    address: string,
     directory: string,
     ohttpKeys: payjoin.OhttpKeys,
     persister: InMemoryReceiverPersister,
@@ -172,22 +172,20 @@ function getInputs(rpcConnection: testUtils.RpcClient): payjoin.InputPair[] {
     const utxos: Utxo[] = JSON.parse(rpcConnection.call("listunspent", []));
     const inputs: payjoin.InputPair[] = [];
     for (const utxo of utxos) {
-        const txin = bitcoin.TxIn.create({
-            previousOutput: bitcoin.OutPoint.create({
+        const txin = payjoin.PlainTxIn.create({
+            previousOutput: payjoin.PlainOutPoint.create({
                 txid: utxo.txid,
                 vout: utxo.vout,
             }),
-            scriptSig: new bitcoin.Script(new Uint8Array([]).buffer),
+            scriptSig: new Uint8Array([]),
             sequence: 0,
             witness: [],
         });
-        const txOut = bitcoin.TxOut.create({
-            value: bitcoin.Amount.fromBtc(utxo.amount),
-            scriptPubkey: new bitcoin.Script(
-                new Uint8Array(Buffer.from(utxo.scriptPubKey, "hex")),
-            ),
+        const txOut = payjoin.PlainTxOut.create({
+            valueSat: BigInt(Math.round(utxo.amount * 100_000_000)),
+            scriptPubkey: Buffer.from(utxo.scriptPubKey, "hex"),
         });
-        const psbtIn = payjoin.PsbtInput.create({
+        const psbtIn = payjoin.PlainPsbtInput.create({
             witnessUtxo: txOut,
             redeemScript: undefined,
             witnessScript: undefined,
@@ -417,10 +415,7 @@ async function testIntegrationV2ToV2(): Promise<void> {
     const sender = env.getSender();
 
     const receiverAddressJson = receiver.call("getnewaddress", []);
-    const receiverAddress = new bitcoin.Address(
-        JSON.parse(receiverAddressJson),
-        bitcoin.Network.Regtest,
-    );
+    const receiverAddress = JSON.parse(receiverAddressJson);
 
     const services = new testUtils.TestServices();
     const directory = services.directoryUrl();
@@ -505,35 +500,18 @@ async function testIntegrationV2ToV2(): Promise<void> {
         body: ohttpContextRequest.request.body,
     });
     const finalResponseBuffer = await finalResponse.arrayBuffer();
-    const checkedPayjoinProposalPsbt = sendCtx
+    const pollOutcome = sendCtx
         .processResponse(finalResponseBuffer, ohttpContextRequest.ohttpCtx)
         .save(senderPersister);
 
-    assert.notStrictEqual(
-        checkedPayjoinProposalPsbt,
-        null,
-        "Checked payjoin proposal should not be null",
-    );
     assert(
-        checkedPayjoinProposalPsbt instanceof
+        pollOutcome instanceof
             payjoin.PollingForProposalTransitionOutcome.Progress,
         "Should be progress outcome",
     );
 
-    if (
-        !(
-            checkedPayjoinProposalPsbt instanceof
-            payjoin.PollingForProposalTransitionOutcome.Progress
-        )
-    ) {
-        throw new Error("Expected Progress outcome");
-    }
-    const checkedPayjoinProposalPsbtInner: bitcoin.Psbt =
-        checkedPayjoinProposalPsbt.inner.inner;
     const payjoinPsbt = JSON.parse(
-        sender.call("walletprocesspsbt", [
-            checkedPayjoinProposalPsbtInner.serializeBase64(),
-        ]),
+        sender.call("walletprocesspsbt", [pollOutcome.inner.psbtBase64]),
     ).psbt;
     const finalPsbt = JSON.parse(
         sender.call("finalizepsbt", [payjoinPsbt, JSON.stringify(false)]),
