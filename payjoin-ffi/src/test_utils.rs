@@ -1,7 +1,6 @@
 use std::io;
 use std::sync::Arc;
 
-use bitcoin_ffi::Psbt;
 use lazy_static::lazy_static;
 use payjoin_test_utils::corepc_node::AddressType;
 use payjoin_test_utils::{
