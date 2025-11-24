@@ -1,6 +1,5 @@
 #![crate_name = "payjoin_ffi"]
 
-pub mod bitcoin_ffi;
 pub mod error;
 #[cfg(feature = "io")]
 pub mod io;
@@ -14,8 +13,6 @@ pub mod test_utils;
 pub mod uri;
 
 pub use payjoin::persist::NoopSessionPersister;
-
-pub use crate::bitcoin_ffi::*;
 pub use crate::ohttp::*;
 pub use crate::output_substitution::*;
 pub use crate::receive::*;
