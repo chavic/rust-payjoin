@@ -13,6 +13,7 @@ pub mod test_utils;
 pub mod uri;
 
 pub use payjoin::persist::NoopSessionPersister;
+
 pub use crate::ohttp::*;
 pub use crate::output_substitution::*;
 pub use crate::receive::*;
