@@ -1,6 +1,6 @@
 import { describe, test, before } from "node:test";
 import assert from "node:assert";
-import { payjoin, bitcoin, uniffiInitAsync } from "../dist/index.js";
+import { payjoin, uniffiInitAsync } from "../dist/index.js";
 
 before(async () => {
     await uniffiInitAsync();
@@ -103,10 +103,7 @@ describe("URI tests", () => {
 describe("Persistence tests", () => {
     test("receiver persistence", () => {
         const persister = new InMemoryReceiverPersister(1);
-        const address = new bitcoin.Address(
-            "tb1q6d3a2w975yny0asuvd9a67ner4nks58ff0q8g4",
-            bitcoin.Network.Signet,
-        );
+        const address = "tb1q6d3a2w975yny0asuvd9a67ner4nks58ff0q8g4";
         const ohttpKeys = payjoin.OhttpKeys.decode(
             new Uint8Array([
                 0x01, 0x00, 0x16, 0x04, 0xba, 0x48, 0xc4, 0x9c, 0x3d, 0x4a, 0x92,
@@ -134,10 +131,7 @@ describe("Persistence tests", () => {
 
     test("sender persistence", () => {
         const persister = new InMemoryReceiverPersister(1);
-        const address = new bitcoin.Address(
-            "2MuyMrZHkbHbfjudmKUy45dU4P17pjG2szK",
-            bitcoin.Network.Testnet,
-        );
+        const address = "2MuyMrZHkbHbfjudmKUy45dU4P17pjG2szK";
         const ohttpKeys = payjoin.OhttpKeys.decode(
             new Uint8Array([
                 0x01, 0x00, 0x16, 0x04, 0xba, 0x48, 0xc4, 0x9c, 0x3d, 0x4a, 0x92,
