@@ -21,6 +21,11 @@ use crate::{ClientResponse, OutputSubstitution, Request};
 
 pub mod error;
 
+#[cfg(feature = "io")]
+fn block_on<F: std::future::Future>(f: F) -> F::Output {
+    tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(f))
+}
+
 macro_rules! impl_save_for_transition {
     ($ty:ident, $next_state:ident) => {
         #[uniffi::export]
@@ -30,6 +35,25 @@ macro_rules! impl_save_for_transition {
                 persister: Arc<dyn JsonReceiverSessionPersister>,
             ) -> Result<$next_state, ReceiverPersistedError> {
                 let adapter = CallbackPersisterAdapter::new(persister);
+                let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+                let value = inner.take().expect("Already saved or moved");
+
+                let res = value
+                    .save(&adapter)
+                    .map_err(|e| ReceiverPersistedError::from(ImplementationError::new(e)))?;
+                Ok(res.into())
+            }
+        }
+
+        #[cfg(feature = "io")]
+        #[uniffi::export]
+        impl $ty {
+            pub fn save_async(
+                &self,
+                persister: Arc<dyn JsonReceiverSessionPersisterAsync>,
+            ) -> Result<$next_state, ReceiverPersistedError> {
+                let adapter = CallbackPersisterAdapterAsync::new(persister);
                 let mut inner = self.0.write().expect("Lock should not be poisoned");
 
                 let value = inner.take().expect("Already saved or moved");
@@ -152,6 +176,16 @@ pub fn replay_receiver_event_log(
     Ok(ReplayResult { state: state.into(), session_history: session_history.into() })
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export]
+pub fn replay_receiver_event_log_async(
+    persister: Arc<dyn JsonReceiverSessionPersisterAsync>,
+) -> Result<ReplayResult, ReceiverReplayError> {
+    let adapter = CallbackPersisterAdapterAsync::new(persister);
+    let (state, session_history) = payjoin::receive::v2::replay_event_log(&adapter)?;
+    Ok(ReplayResult { state: state.into(), session_history: session_history.into() })
+}
+
 /// Represents the status of a session that can be inferred from the information in the session
 /// event log.
 #[derive(uniffi::Object)]
@@ -208,6 +242,23 @@ impl InitialReceiveTransition {
         persister: Arc<dyn JsonReceiverSessionPersister>,
     ) -> Result<Initialized, ForeignError> {
         let adapter = CallbackPersisterAdapter::new(persister);
+        let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+        let value = inner.take().expect("Already saved or moved");
+
+        let res = value.save(&adapter)?;
+        Ok(res.into())
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl InitialReceiveTransition {
+    pub fn save_async(
+        &self,
+        persister: Arc<dyn JsonReceiverSessionPersisterAsync>,
+    ) -> Result<Initialized, ForeignError> {
+        let adapter = CallbackPersisterAdapterAsync::new(persister);
         let mut inner = self.0.write().expect("Lock should not be poisoned");
 
         let value = inner.take().expect("Already saved or moved");
@@ -315,6 +366,23 @@ impl InitializedTransition {
         persister: Arc<dyn JsonReceiverSessionPersister>,
     ) -> Result<InitializedTransitionOutcome, ReceiverPersistedError> {
         let adapter = CallbackPersisterAdapter::new(persister);
+        let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+        let value = inner.take().expect("Already saved or moved");
+
+        let res = value.save(&adapter).map_err(ReceiverPersistedError::from)?;
+        Ok(res.into())
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl InitializedTransition {
+    pub fn save_async(
+        &self,
+        persister: Arc<dyn JsonReceiverSessionPersisterAsync>,
+    ) -> Result<InitializedTransitionOutcome, ReceiverPersistedError> {
+        let adapter = CallbackPersisterAdapterAsync::new(persister);
         let mut inner = self.0.write().expect("Lock should not be poisoned");
 
         let value = inner.take().expect("Already saved or moved");
@@ -454,6 +522,13 @@ pub trait CanBroadcast: Send + Sync {
     fn callback(&self, tx: Vec<u8>) -> Result<bool, ForeignError>;
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait CanBroadcastAsync: Send + Sync {
+    async fn callback(&self, tx: Vec<u8>) -> Result<bool, ForeignError>;
+}
+
 #[uniffi::export]
 impl UncheckedOriginalPayload {
     pub fn check_broadcast_suitability(
@@ -481,6 +556,29 @@ impl UncheckedOriginalPayload {
     pub fn assume_interactive_receiver(&self) -> AssumeInteractiveTransition {
         AssumeInteractiveTransition(Arc::new(RwLock::new(Some(
             self.0.clone().assume_interactive_receiver(),
+        ))))
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl UncheckedOriginalPayload {
+    pub fn check_broadcast_suitability_async(
+        &self,
+        min_fee_rate: Option<u64>,
+        can_broadcast: Arc<dyn CanBroadcastAsync>,
+    ) -> UncheckedOriginalPayloadTransition {
+        UncheckedOriginalPayloadTransition(Arc::new(RwLock::new(Some(
+            self.0.clone().check_broadcast_suitability(
+                min_fee_rate.map(FeeRate::from_sat_per_kwu),
+                |transaction| {
+                    block_on(
+                        can_broadcast
+                            .callback(payjoin::bitcoin::consensus::encode::serialize(transaction)),
+                    )
+                    .map_err(|e| ImplementationError::new(e).into())
+                },
+            ),
         ))))
     }
 }
@@ -520,6 +618,13 @@ pub trait IsScriptOwned: Send + Sync {
     fn callback(&self, script: Vec<u8>) -> Result<bool, ForeignError>;
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait IsScriptOwnedAsync: Send + Sync {
+    async fn callback(&self, script: Vec<u8>) -> Result<bool, ForeignError>;
+}
+
 #[uniffi::export]
 impl MaybeInputsOwned {
     ///The Sender’s Original PSBT
@@ -535,6 +640,22 @@ impl MaybeInputsOwned {
         MaybeInputsOwnedTransition(Arc::new(RwLock::new(Some(
             self.0.clone().check_inputs_not_owned(&mut |input| {
                 is_owned.callback(input.to_bytes()).map_err(|e| ImplementationError::new(e).into())
+            }),
+        ))))
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl MaybeInputsOwned {
+    pub fn check_inputs_not_owned_async(
+        &self,
+        is_owned: Arc<dyn IsScriptOwnedAsync>,
+    ) -> MaybeInputsOwnedTransition {
+        MaybeInputsOwnedTransition(Arc::new(RwLock::new(Some(
+            self.0.clone().check_inputs_not_owned(&mut |input| {
+                block_on(is_owned.callback(input.to_bytes()))
+                    .map_err(|e| ImplementationError::new(e).into())
             }),
         ))))
     }
@@ -575,6 +696,13 @@ pub trait IsOutputKnown: Send + Sync {
     fn callback(&self, outpoint: OutPoint) -> Result<bool, ForeignError>;
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait IsOutputKnownAsync: Send + Sync {
+    async fn callback(&self, outpoint: OutPoint) -> Result<bool, ForeignError>;
+}
+
 #[uniffi::export]
 impl MaybeInputsSeen {
     pub fn check_no_inputs_seen_before(
@@ -585,6 +713,22 @@ impl MaybeInputsSeen {
             self.0.clone().check_no_inputs_seen_before(&mut |outpoint| {
                 is_known
                     .callback((*outpoint).into())
+                    .map_err(|e| ImplementationError::new(e).into())
+            }),
+        ))))
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl MaybeInputsSeen {
+    pub fn check_no_inputs_seen_before_async(
+        &self,
+        is_known: Arc<dyn IsOutputKnownAsync>,
+    ) -> MaybeInputsSeenTransition {
+        MaybeInputsSeenTransition(Arc::new(RwLock::new(Some(
+            self.0.clone().check_no_inputs_seen_before(&mut |outpoint| {
+                block_on(is_known.callback((*outpoint).into()))
                     .map_err(|e| ImplementationError::new(e).into())
             }),
         ))))
@@ -634,6 +778,22 @@ impl OutputsUnknown {
             self.0.clone().identify_receiver_outputs(&mut |input| {
                 is_receiver_output
                     .callback(input.to_bytes())
+                    .map_err(|e| ImplementationError::new(e).into())
+            }),
+        ))))
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl OutputsUnknown {
+    pub fn identify_receiver_outputs_async(
+        &self,
+        is_receiver_output: Arc<dyn IsScriptOwnedAsync>,
+    ) -> OutputsUnknownTransition {
+        OutputsUnknownTransition(Arc::new(RwLock::new(Some(
+            self.0.clone().identify_receiver_outputs(&mut |input| {
+                block_on(is_receiver_output.callback(input.to_bytes()))
                     .map_err(|e| ImplementationError::new(e).into())
             }),
         ))))
@@ -895,6 +1055,13 @@ pub trait ProcessPsbt: Send + Sync {
     fn callback(&self, psbt: String) -> Result<String, ForeignError>;
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait ProcessPsbtAsync: Send + Sync {
+    async fn callback(&self, psbt: String) -> Result<String, ForeignError>;
+}
+
 #[uniffi::export]
 impl ProvisionalProposal {
     pub fn finalize_proposal(
@@ -912,6 +1079,23 @@ impl ProvisionalProposal {
     }
 
     pub fn psbt_to_sign(&self) -> bitcoin_ffi::Psbt { self.0.clone().psbt_to_sign().into() }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl ProvisionalProposal {
+    pub fn finalize_proposal_async(
+        &self,
+        process_psbt: Arc<dyn ProcessPsbtAsync>,
+    ) -> ProvisionalProposalTransition {
+        ProvisionalProposalTransition(Arc::new(RwLock::new(Some(
+            self.0.clone().finalize_proposal(|pre_processed| {
+                let psbt = block_on(process_psbt.callback(pre_processed.to_string()))
+                    .map_err(ImplementationError::new)?;
+                Ok(Psbt::from_str(&psbt).map_err(ImplementationError::new)?)
+            }),
+        ))))
+    }
 }
 
 #[derive(Clone, uniffi::Object)]
@@ -1052,6 +1236,23 @@ impl HasReplyableErrorTransition {
     }
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl HasReplyableErrorTransition {
+    pub fn save_async(
+        &self,
+        persister: Arc<dyn JsonReceiverSessionPersisterAsync>,
+    ) -> Result<(), ReceiverPersistedError> {
+        let adapter = CallbackPersisterAdapterAsync::new(persister);
+        let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+        let value = inner.take().expect("Already saved or moved");
+
+        value.save(&adapter).map_err(ReceiverPersistedError::from)?;
+        Ok(())
+    }
+}
+
 #[uniffi::export]
 impl HasReplyableError {
     pub fn create_error_request(
@@ -1076,14 +1277,26 @@ impl HasReplyableError {
 
 #[uniffi::export(with_foreign)]
 pub trait TransactionExists: Send + Sync {
-    // TODO: Is there an ffi exported txid type that we can use here?
-    // TODO: Is there a ffi type for the serialized tx?
     fn callback(&self, txid: String) -> Result<Option<Vec<u8>>, ForeignError>;
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait TransactionExistsAsync: Send + Sync {
+    async fn callback(&self, txid: String) -> Result<Option<Vec<u8>>, ForeignError>;
 }
 
 #[uniffi::export(with_foreign)]
 pub trait OutpointSpent: Send + Sync {
     fn callback(&self, outpoint: OutPoint) -> Result<bool, ForeignError>;
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait OutpointSpentAsync: Send + Sync {
+    async fn callback(&self, outpoint: OutPoint) -> Result<bool, ForeignError>;
 }
 
 #[allow(clippy::type_complexity)]
@@ -1109,6 +1322,23 @@ impl MonitorTransition {
         persister: Arc<dyn JsonReceiverSessionPersister>,
     ) -> Result<(), ReceiverPersistedError> {
         let adapter = CallbackPersisterAdapter::new(persister);
+        let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+        let value = inner.take().expect("Already saved or moved");
+
+        value.save(&adapter).map_err(ReceiverPersistedError::from)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl MonitorTransition {
+    pub fn save_async(
+        &self,
+        persister: Arc<dyn JsonReceiverSessionPersisterAsync>,
+    ) -> Result<(), ReceiverPersistedError> {
+        let adapter = CallbackPersisterAdapterAsync::new(persister);
         let mut inner = self.0.write().expect("Lock should not be poisoned");
 
         let value = inner.take().expect("Already saved or moved");
@@ -1157,12 +1387,43 @@ impl Monitor {
     }
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl Monitor {
+    pub fn monitor_async(
+        &self,
+        transaction_exists: Arc<dyn TransactionExistsAsync>,
+        outpoint_spent: Arc<dyn OutpointSpentAsync>,
+    ) -> MonitorTransition {
+        MonitorTransition(Arc::new(RwLock::new(Some(self.0.clone().check_payment(
+            |txid| {
+                block_on(transaction_exists.callback(txid.to_string()))
+                    .and_then(|buf| buf.map(try_deserialize_tx).transpose())
+                    .map_err(|e| ImplementationError::new(e).into())
+            },
+            |outpoint| {
+                block_on(outpoint_spent.callback(outpoint.into()))
+                    .map_err(|e| ImplementationError::new(e).into())
+            },
+        )))))
+    }
+}
+
 /// Session persister that should save and load events as JSON strings.
 #[uniffi::export(with_foreign)]
 pub trait JsonReceiverSessionPersister: Send + Sync {
     fn save(&self, event: String) -> Result<(), ForeignError>;
     fn load(&self) -> Result<Vec<String>, ForeignError>;
     fn close(&self) -> Result<(), ForeignError>;
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait JsonReceiverSessionPersisterAsync: Send + Sync {
+    async fn save(&self, event: String) -> Result<(), ForeignError>;
+    async fn load(&self) -> Result<Vec<String>, ForeignError>;
+    async fn close(&self) -> Result<(), ForeignError>;
 }
 
 /// Adapter for the [JsonReceiverSessionPersister] trait to use the save and load callbacks.
@@ -1207,4 +1468,54 @@ impl payjoin::persist::SessionPersister for CallbackPersisterAdapter {
     }
 
     fn close(&self) -> Result<(), Self::InternalStorageError> { self.callback_persister.close() }
+}
+
+#[cfg(feature = "io")]
+struct CallbackPersisterAdapterAsync {
+    callback_persister: Arc<dyn JsonReceiverSessionPersisterAsync>,
+}
+
+#[cfg(feature = "io")]
+impl CallbackPersisterAdapterAsync {
+    pub fn new(callback_persister: Arc<dyn JsonReceiverSessionPersisterAsync>) -> Self {
+        Self { callback_persister }
+    }
+}
+
+#[cfg(feature = "io")]
+impl payjoin::persist::SessionPersister for CallbackPersisterAdapterAsync {
+    type SessionEvent = payjoin::receive::v2::SessionEvent;
+    type InternalStorageError = ForeignError;
+
+    fn save_event(&self, event: Self::SessionEvent) -> Result<(), Self::InternalStorageError> {
+        let uni_event: ReceiverSessionEvent = event.into();
+        block_on(
+            self.callback_persister
+                .save(uni_event.to_json().map_err(|e| ForeignError::InternalError(e.to_string()))?),
+        )
+    }
+
+    fn load(
+        &self,
+    ) -> Result<Box<dyn Iterator<Item = Self::SessionEvent>>, Self::InternalStorageError> {
+        let res = block_on(self.callback_persister.load())?;
+        Ok(Box::new(
+            match res
+                .into_iter()
+                .map(|event| {
+                    ReceiverSessionEvent::from_json(event)
+                        .map_err(|e| ForeignError::InternalError(e.to_string()))
+                        .map(|e| e.into())
+                })
+                .collect::<Result<Vec<_>, _>>()
+            {
+                Ok(events) => Box::new(events.into_iter()),
+                Err(e) => return Err(e),
+            },
+        ))
+    }
+
+    fn close(&self) -> Result<(), Self::InternalStorageError> {
+        block_on(self.callback_persister.close())
+    }
 }

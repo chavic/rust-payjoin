@@ -8,8 +8,8 @@ exclude = ["tests"]
 [features]
 default = ["io"]
 dart = ["dep:uniffi-dart"]
-io = ["payjoin/io"]
-_test-utils = ["payjoin-test-utils", "tokio", "io"]
+io = ["payjoin/io", "dep:tokio", "dep:async-trait"]
+_test-utils = ["payjoin-test-utils", "io"]
 _manual-tls = ["payjoin/_manual-tls"]
 wasm_js = ["getrandom/js"]
 
@@ -26,6 +26,7 @@ uniffi = { version = "0.29.4", features = ["build", "cli"] }
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "04f0007", features = ["build"], optional = true }
 
 [dependencies]
+async-trait = { version = "0.1", optional = true }
 base64 = "0.22.1"
 bitcoin-ffi = { git = "https://github.com/benalleng/bitcoin-ffi.git", rev = "8e3a23b" }
 getrandom = "0.2"

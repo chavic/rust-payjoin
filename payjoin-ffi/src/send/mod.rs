@@ -13,6 +13,11 @@ use crate::uri::PjUri;
 
 pub mod error;
 
+#[cfg(feature = "io")]
+fn block_on<F: std::future::Future>(f: F) -> F::Output {
+    tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(f))
+}
+
 macro_rules! impl_save_for_transition {
     ($ty:ident, $next_state:ident) => {
         #[uniffi::export]
@@ -22,6 +27,23 @@ macro_rules! impl_save_for_transition {
                 persister: Arc<dyn JsonSenderSessionPersister>,
             ) -> Result<$next_state, SenderPersistedError> {
                 let adapter = CallbackPersisterAdapter::new(persister);
+                let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+                let value = inner.take().expect("Already saved or moved");
+
+                let res = value.save(&adapter).map_err(SenderPersistedError::from)?;
+                Ok(res.into())
+            }
+        }
+
+        #[cfg(feature = "io")]
+        #[uniffi::export]
+        impl $ty {
+            pub fn save_async(
+                &self,
+                persister: Arc<dyn JsonSenderSessionPersisterAsync>,
+            ) -> Result<$next_state, SenderPersistedError> {
+                let adapter = CallbackPersisterAdapterAsync::new(persister);
                 let mut inner = self.0.write().expect("Lock should not be poisoned");
 
                 let value = inner.take().expect("Already saved or moved");
@@ -111,6 +133,16 @@ pub fn replay_sender_event_log(
     Ok(SenderReplayResult { state: state.into(), session_history: session_history.into() })
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export]
+pub fn replay_sender_event_log_async(
+    persister: Arc<dyn JsonSenderSessionPersisterAsync>,
+) -> Result<SenderReplayResult, SenderReplayError> {
+    let adapter = CallbackPersisterAdapterAsync::new(persister);
+    let (state, session_history) = payjoin::send::v2::replay_event_log(&adapter)?;
+    Ok(SenderReplayResult { state: state.into(), session_history: session_history.into() })
+}
+
 /// Represents the status of a session that can be inferred from the information in the session
 /// event log.
 #[derive(uniffi::Object)]
@@ -180,6 +212,23 @@ impl InitialSendTransition {
         persister: Arc<dyn JsonSenderSessionPersister>,
     ) -> Result<WithReplyKey, ForeignError> {
         let adapter = CallbackPersisterAdapter::new(persister);
+        let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+        let value = inner.take().expect("Already saved or moved");
+
+        let res = value.save(&adapter).map_err(|e| ForeignError::InternalError(e.to_string()))?;
+        Ok(res.into())
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl InitialSendTransition {
+    pub fn save_async(
+        &self,
+        persister: Arc<dyn JsonSenderSessionPersisterAsync>,
+    ) -> Result<WithReplyKey, ForeignError> {
+        let adapter = CallbackPersisterAdapterAsync::new(persister);
         let mut inner = self.0.write().expect("Lock should not be poisoned");
 
         let value = inner.take().expect("Already saved or moved");
@@ -319,6 +368,23 @@ impl WithReplyKeyTransition {
         persister: Arc<dyn JsonSenderSessionPersister>,
     ) -> Result<PollingForProposal, SenderPersistedError> {
         let adapter = CallbackPersisterAdapter::new(persister);
+        let mut inner = self.0.write().expect("Lock should not be poisoned");
+
+        let value = inner.take().expect("Already saved or moved");
+
+        let res = value.save(&adapter).map_err(SenderPersistedError::from)?;
+        Ok(res.into())
+    }
+}
+
+#[cfg(feature = "io")]
+#[uniffi::export]
+impl WithReplyKeyTransition {
+    pub fn save_async(
+        &self,
+        persister: Arc<dyn JsonSenderSessionPersisterAsync>,
+    ) -> Result<PollingForProposal, SenderPersistedError> {
+        let adapter = CallbackPersisterAdapterAsync::new(persister);
         let mut inner = self.0.write().expect("Lock should not be poisoned");
 
         let value = inner.take().expect("Already saved or moved");
@@ -486,6 +552,15 @@ pub trait JsonSenderSessionPersister: Send + Sync {
     fn close(&self) -> Result<(), ForeignError>;
 }
 
+#[cfg(feature = "io")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait JsonSenderSessionPersisterAsync: Send + Sync {
+    async fn save(&self, event: String) -> Result<(), ForeignError>;
+    async fn load(&self) -> Result<Vec<String>, ForeignError>;
+    async fn close(&self) -> Result<(), ForeignError>;
+}
+
 // The adapter to use the save and load callbacks
 #[derive(Clone)]
 struct CallbackPersisterAdapter {
@@ -530,4 +605,55 @@ impl payjoin::persist::SessionPersister for CallbackPersisterAdapter {
     }
 
     fn close(&self) -> Result<(), Self::InternalStorageError> { self.callback_persister.close() }
+}
+
+#[cfg(feature = "io")]
+#[derive(Clone)]
+struct CallbackPersisterAdapterAsync {
+    callback_persister: Arc<dyn JsonSenderSessionPersisterAsync>,
+}
+
+#[cfg(feature = "io")]
+impl CallbackPersisterAdapterAsync {
+    pub fn new(callback_persister: Arc<dyn JsonSenderSessionPersisterAsync>) -> Self {
+        Self { callback_persister }
+    }
+}
+
+#[cfg(feature = "io")]
+impl payjoin::persist::SessionPersister for CallbackPersisterAdapterAsync {
+    type SessionEvent = payjoin::send::v2::SessionEvent;
+    type InternalStorageError = ForeignError;
+
+    fn save_event(&self, event: Self::SessionEvent) -> Result<(), Self::InternalStorageError> {
+        let event: SenderSessionEvent = event.into();
+        block_on(
+            self.callback_persister
+                .save(event.to_json().map_err(|e| ForeignError::InternalError(e.to_string()))?),
+        )
+    }
+
+    fn load(
+        &self,
+    ) -> Result<Box<dyn Iterator<Item = Self::SessionEvent>>, Self::InternalStorageError> {
+        let res = block_on(self.callback_persister.load())?;
+        Ok(Box::new(
+            match res
+                .into_iter()
+                .map(|event| {
+                    SenderSessionEvent::from_json(event)
+                        .map_err(|e| ForeignError::InternalError(e.to_string()))
+                        .map(|e| e.into())
+                })
+                .collect::<Result<Vec<_>, _>>()
+            {
+                Ok(events) => Box::new(events.into_iter()),
+                Err(e) => return Err(e),
+            },
+        ))
+    }
+
+    fn close(&self) -> Result<(), Self::InternalStorageError> {
+        block_on(self.callback_persister.close())
+    }
 }
