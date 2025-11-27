@@ -5,7 +5,6 @@ import json
 
 from payjoin import *
 from typing import Optional
-import payjoin.bitcoin as bitcoinffi
 
 # The below sys path setting is required to use the 'payjoin' module in the 'src' directory
 # This script is in the 'tests' directory and the 'payjoin' module is in the 'src' directory
@@ -83,7 +82,7 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
 
         raise Exception(f"Unknown receiver state: {receiver}")
 
-    def create_receiver_context(self, receiver_address: bitcoinffi.Address, directory: str, ohttp_keys: OhttpKeys, recv_persister: InMemoryReceiverSessionEventLog) -> Initialized:
+    def create_receiver_context(self, receiver_address: str, directory: str, ohttp_keys: OhttpKeys, recv_persister: InMemoryReceiverSessionEventLog) -> Initialized:
         receiver = ReceiverBuilder(address=receiver_address, directory=directory, ohttp_keys=ohttp_keys).build().save(recv_persister)
         return receiver
 
@@ -134,7 +133,7 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
 
     async def test_integration_v2_to_v2(self):
         try:
-            receiver_address = bitcoinffi.Address(json.loads(self.receiver.call("getnewaddress", [])), bitcoinffi.Network.REGTEST)
+            receiver_address = json.loads(self.receiver.call("getnewaddress", []))
             init_tracing()
             services = TestServices.initialize()
 
@@ -196,21 +195,24 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
             )
             poll_outcome = send_ctx.process_response(response.content, request.ohttp_ctx).save(sender_persister)
             if poll_outcome.is_PROGRESS():
-                checked_payjoin_proposal_psbt = bitcoinffi.Psbt.deserialize_base64(poll_outcome.psbt_base64)
+                checked_payjoin_proposal_psbt = poll_outcome.psbt_base64
             else:
                 self.fail("Unexpected stasis while polling for proposal")
             print(f"checked_payjoin_proposal_psbt: {checked_payjoin_proposal_psbt}")
             self.assertIsNotNone(checked_payjoin_proposal_psbt)
-            payjoin_psbt = json.loads(self.sender.call("walletprocesspsbt", [checked_payjoin_proposal_psbt.serialize_base64()]))["psbt"]
-            final_psbt = json.loads(self.sender.call("finalizepsbt", [payjoin_psbt, json.dumps(False)]))["psbt"]
-            payjoin_tx = bitcoinffi.Psbt.deserialize_base64(final_psbt).extract_tx()
-            self.sender.call("sendrawtransaction", [json.dumps(payjoin_tx.serialize().hex())])
+            payjoin_psbt = json.loads(self.sender.call("walletprocesspsbt", [checked_payjoin_proposal_psbt]))["psbt"]
+            final_psbt_json = json.loads(self.sender.call("finalizepsbt", [payjoin_psbt, json.dumps(False)]))
+            final_psbt = final_psbt_json["psbt"]
+            extraction = json.loads(self.sender.call("finalizepsbt", [payjoin_psbt, json.dumps(True)]))
+            final_hex = extraction["hex"]
+            self.sender.call("sendrawtransaction", [json.dumps(final_hex)])
 
             # Check resulting transaction and balances
-            network_fees = bitcoinffi.Psbt.deserialize_base64(final_psbt).fee().to_btc()
+            network_fees = float(json.loads(self.sender.call("decodepsbt", [json.dumps(final_psbt)]))["fee"])
+            decoded_tx = json.loads(self.sender.call("decoderawtransaction", [json.dumps(final_hex)]))
             # Sender sent the entire value of their utxo to receiver (minus fees)
-            self.assertEqual(len(payjoin_tx.input()), 2);
-            self.assertEqual(len(payjoin_tx.output()), 1);
+            self.assertEqual(len(decoded_tx["vin"]), 2);
+            self.assertEqual(len(decoded_tx["vout"]), 1);
             self.assertEqual(float(json.loads(self.receiver.call("getbalances", []))["mine"]["untrusted_pending"]), 100 - network_fees)
             self.assertEqual(float(self.sender.call("getbalance", [])), 0)
             return
@@ -218,7 +220,7 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
             print("Caught:", e)
             raise
 
-def build_sweep_psbt(sender: RpcClient, pj_uri: PjUri) -> bitcoinffi.Psbt:
+def build_sweep_psbt(sender: RpcClient, pj_uri: PjUri) -> str:
     outputs = {}
     outputs[pj_uri.address()] = 50
     psbt = json.loads(sender.call(
@@ -270,8 +272,25 @@ class IsScriptOwnedCallback(IsScriptOwned):
 
     def callback(self, script):
         try:
-            address = bitcoinffi.Address.from_script(bitcoinffi.Script(script), bitcoinffi.Network.REGTEST)
-            return json.loads(self.connection.call("getaddressinfo", [str(address)]))["ismine"]
+            script_hex = bytes(script).hex()
+            decoded_script = json.loads(self.connection.call("decodescript", [json.dumps(script_hex)]))
+            candidates = []
+            if isinstance(decoded_script.get("address"), str):
+                candidates.append(decoded_script["address"])
+            if isinstance(decoded_script.get("addresses"), list):
+                candidates.extend([addr for addr in decoded_script["addresses"] if isinstance(addr, str)])
+            segwit = decoded_script.get("segwit")
+            if isinstance(segwit, dict):
+                if isinstance(segwit.get("address"), str):
+                    candidates.append(segwit["address"])
+                if isinstance(segwit.get("addresses"), list):
+                    candidates.extend([addr for addr in segwit["addresses"] if isinstance(addr, str)])
+
+            for addr in candidates:
+                info = json.loads(self.connection.call("getaddressinfo", [json.dumps(addr)]))
+                if info.get("ismine") is True:
+                    return True
+            return False
         except Exception as e:
             print(f"An error occurred: {e}")
             return None
