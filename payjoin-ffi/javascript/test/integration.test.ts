@@ -1,4 +1,4 @@
-import { payjoin, bitcoin, uniffiInitAsync } from "../dist/index.js";
+import { payjoin, uniffiInitAsync } from "../dist/index.js";
 import * as testUtils from "../test-utils/index.js";
 import assert from "assert";
 
@@ -86,15 +86,48 @@ class IsScriptOwnedCallback implements payjoin.IsScriptOwned {
 
     callback(script: ArrayBuffer): boolean {
         try {
-            const scriptObj = new bitcoin.Script(script);
-            const address = bitcoin.Address.fromScript(
-                scriptObj,
-                bitcoin.Network.Regtest,
+            const scriptHex = Buffer.from(script).toString("hex");
+            const decodedScript = JSON.parse(
+                this.connection.call("decodescript", [JSON.stringify(scriptHex)]),
             );
-            const addressStr = address.toQrUri().split(":")[1];
-            const result = this.connection.call("getaddressinfo", [addressStr]);
-            const decoded = JSON.parse(result);
-            return decoded.ismine === true;
+
+            const candidates: string[] = [];
+            if (typeof decodedScript.address === "string") {
+                candidates.push(decodedScript.address);
+            }
+            if (Array.isArray(decodedScript.addresses)) {
+                candidates.push(
+                    ...decodedScript.addresses.filter(
+                        (addr: unknown): addr is string => typeof addr === "string",
+                    ),
+                );
+            }
+            if (decodedScript.segwit && typeof decodedScript.segwit === "object") {
+                const { address, addresses } = decodedScript.segwit as {
+                    address?: unknown;
+                    addresses?: unknown;
+                };
+                if (typeof address === "string") {
+                    candidates.push(address);
+                }
+                if (Array.isArray(addresses)) {
+                    candidates.push(
+                        ...addresses.filter(
+                            (addr: unknown): addr is string => typeof addr === "string",
+                        ),
+                    );
+                }
+            }
+
+            for (const addr of candidates) {
+                const info = JSON.parse(
+                    this.connection.call("getaddressinfo", [JSON.stringify(addr)]),
+                );
+                if (info.ismine === true) {
+                    return true;
+                }
+            }
+            return false;
         } catch {
             return false;
         }
@@ -513,17 +546,33 @@ async function testIntegrationV2ToV2(): Promise<void> {
     const payjoinPsbt = JSON.parse(
         sender.call("walletprocesspsbt", [pollOutcome.inner.psbtBase64]),
     ).psbt;
-    const finalPsbt = JSON.parse(
+    const finalPsbtJson = JSON.parse(
         sender.call("finalizepsbt", [payjoinPsbt, JSON.stringify(false)]),
-    ).psbt;
-    const payjoinTx = bitcoin.Psbt.deserializeBase64(finalPsbt).extractTx();
-    sender.call("sendrawtransaction", [
-        JSON.stringify(Buffer.from(payjoinTx.serialize()).toString("hex")),
-    ]);
+    );
+    const finalPsbt = finalPsbtJson.psbt as string;
+    const extraction = JSON.parse(
+        sender.call("finalizepsbt", [payjoinPsbt, JSON.stringify(true)]),
+    );
+    const finalHex = extraction.hex as string;
+    sender.call("sendrawtransaction", [JSON.stringify(finalHex)]);
 
-    const networkFees = bitcoin.Psbt.deserializeBase64(finalPsbt).fee().toBtc();
-    assert.strictEqual(payjoinTx.input().length, 2, "Should have 2 inputs");
-    assert.strictEqual(payjoinTx.output().length, 1, "Should have 1 output");
+    const decodedPsbt = JSON.parse(
+        sender.call("decodepsbt", [JSON.stringify(finalPsbt)]),
+    );
+    const networkFees = Number(decodedPsbt.fee);
+    const decodedTx = JSON.parse(
+        sender.call("decoderawtransaction", [JSON.stringify(finalHex)]),
+    );
+    assert.strictEqual(
+        decodedTx.vin.length,
+        2,
+        "Should have 2 inputs",
+    );
+    assert.strictEqual(
+        decodedTx.vout.length,
+        1,
+        "Should have 1 output",
+    );
 
     const receiverBalance = JSON.parse(receiver.call("getbalances", [])).mine
         .untrusted_pending;
