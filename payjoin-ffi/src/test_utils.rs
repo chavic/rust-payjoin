@@ -209,14 +209,3 @@ pub fn payjoin_proposal_with_sender_info() -> String {
 
 #[uniffi::export]
 pub fn receiver_input_contribution() -> String { RECEIVER_INPUT_CONTRIBUTION.to_string() }
-
-#[uniffi::export]
-pub fn parsed_original_psbt() -> Psbt { PARSED_ORIGINAL_PSBT.clone().into() }
-
-#[uniffi::export]
-pub fn parsed_payjoin_proposal() -> Psbt { PARSED_PAYJOIN_PROPOSAL.clone().into() }
-
-#[uniffi::export]
-pub fn parsed_payjoin_proposal_with_sender_info() -> Psbt {
-    PARSED_PAYJOIN_PROPOSAL_WITH_SENDER_INFO.clone().into()
-}
