@@ -4,8 +4,7 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 use payjoin_test_utils::corepc_node::AddressType;
 use payjoin_test_utils::{
-    corepc_node, EXAMPLE_URL, INVALID_PSBT, ORIGINAL_PSBT, PARSED_ORIGINAL_PSBT,
-    PARSED_PAYJOIN_PROPOSAL, PARSED_PAYJOIN_PROPOSAL_WITH_SENDER_INFO, PAYJOIN_PROPOSAL,
+    corepc_node, EXAMPLE_URL, INVALID_PSBT, ORIGINAL_PSBT, PAYJOIN_PROPOSAL,
     PAYJOIN_PROPOSAL_WITH_SENDER_INFO, QUERY_PARAMS, RECEIVER_INPUT_CONTRIBUTION,
 };
 use serde_json::Value;
