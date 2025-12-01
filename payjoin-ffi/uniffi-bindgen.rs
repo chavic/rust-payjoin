@@ -1,6 +1,4 @@
-fn main() {
-    uniffi_bindgen()
-}
+fn main() { uniffi_bindgen() }
 
 fn uniffi_bindgen() {
     // uniffi_bindgen_main parses command line arguments for officially supported languages,

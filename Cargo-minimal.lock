@@ -2466,6 +2466,7 @@ dependencies = [
 name = "payjoin-ffi"
 version = "0.24.0"
 dependencies = [
+ "async-trait",
  "base64 0.22.1",
  "bdk",
  "bitcoin-ffi",
@@ -4056,7 +4057,7 @@ dependencies = [
 [[package]]
 name = "uniffi-dart"
 version = "0.1.0"
-source = "git+https://github.com/Uniffi-Dart/uniffi-dart.git?rev=04f0007#04f00070418dc9c0a116386d2ca01d617a7079e4"
+source = "git+https://github.com/chavic/uniffi-dart.git?branch=chavic%2Fasync-await-support-completion#28da21f85e14e48fa337a9b72dc930cb532303ed"
 dependencies = [
  "anyhow",
  "camino",
@@ -4127,14 +4128,13 @@ dependencies = [
 [[package]]
 name = "uniffi_dart_macro"
 version = "0.1.0"
-source = "git+https://github.com/Uniffi-Dart/uniffi-dart.git?rev=04f0007#04f00070418dc9c0a116386d2ca01d617a7079e4"
+source = "git+https://github.com/chavic/uniffi-dart.git?branch=chavic%2Fasync-await-support-completion#28da21f85e14e48fa337a9b72dc930cb532303ed"
 dependencies = [
  "futures",
  "proc-macro2",
  "quote",
  "stringcase 0.3.0",
  "syn 1.0.109",
- "tokio",
  "uniffi",
 ]
 

@@ -23,7 +23,7 @@ path = "uniffi-bindgen.rs"
 
 [build-dependencies]
 uniffi = { version = "0.29.4", features = ["build", "cli"] }
-uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "04f0007", features = ["build"], optional = true }
+uniffi-dart = { git = "https://github.com/chavic/uniffi-dart.git", branch = "chavic/async-await-support-completion", features = ["build"], optional = true }
 
 [dependencies]
 async-trait = { version = "0.1", optional = true }
@@ -40,7 +40,7 @@ serde_json = "1.0.142"
 thiserror = "2.0.14"
 tokio = { version = "1.47.1", features = ["full"], optional = true }
 uniffi = { version = "0.29.4" }
-uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "04f0007", optional = true }
+uniffi-dart = { git = "https://github.com/chavic/uniffi-dart.git", branch = "chavic/async-await-support-completion", optional = true }
 url = "2.5.4"
 
 [dev-dependencies]
