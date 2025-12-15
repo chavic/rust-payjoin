@@ -96,9 +96,17 @@ class IsScriptOwnedCallback implements payjoin.IsScriptOwned {
       );
 
       final candidates = <String>[];
+      final addressField = decodedScript["address"];
+      if (addressField is String) {
+        candidates.add(addressField);
+      }
       final addresses = decodedScript["addresses"];
       if (addresses is List) {
         candidates.addAll(addresses.whereType<String>());
+      }
+      final p2sh = decodedScript["p2sh"];
+      if (p2sh is String) {
+        candidates.add(p2sh);
       }
       final segwit = decodedScript["segwit"];
       if (segwit is Map) {
@@ -112,19 +120,16 @@ class IsScriptOwnedCallback implements payjoin.IsScriptOwned {
         }
       }
 
-      print("IsScriptOwned decoded=$decodedScript candidates=$candidates");
       for (final addr in candidates) {
         final info = jsonDecode(
           connection.call("getaddressinfo", [jsonEncode(addr)]),
         );
-        print("IsScriptOwned getaddressinfo($addr) -> $info");
         if (info["ismine"] == true) {
           return true;
         }
       }
       return false;
     } catch (e) {
-      print("IsScriptOwned error: $e");
       return false;
     }
   }
@@ -502,6 +507,6 @@ void main() {
         100 - network_fees,
       );
       expect(jsonDecode(sender.call("getbalance", [])), 0.0);
-    }, skip: 'Fails with StorageReceiverPersistedException in current harness');
+    }, timeout: const Timeout(Duration(minutes: 5)));
   });
 }
