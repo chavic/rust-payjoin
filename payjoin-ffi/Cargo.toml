@@ -22,7 +22,6 @@ name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
 
 [dependencies]
-bitcoin-ffi = { git = "https://github.com/bitcoindevkit/bitcoin-ffi", rev = "39cc12b" }
 getrandom = "0.2"
 lazy_static = "1.5.0"
 ohttp = { package = "bitcoin-ohttp", version = "0.6.0" }

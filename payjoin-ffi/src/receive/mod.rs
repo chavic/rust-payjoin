@@ -1191,11 +1191,6 @@ pub trait TransactionExists: Send + Sync {
     fn callback(&self, txid: String) -> Result<Option<Vec<u8>>, ForeignError>;
 }
 
-#[uniffi::export(with_foreign)]
-pub trait OutpointSpent: Send + Sync {
-    fn callback(&self, outpoint: PlainOutPoint) -> Result<bool, ForeignError>;
-}
-
 #[allow(clippy::type_complexity)]
 #[derive(uniffi::Object)]
 pub struct MonitorTransition(
@@ -1246,24 +1241,13 @@ fn try_deserialize_tx(
 
 #[uniffi::export]
 impl Monitor {
-    pub fn monitor(
-        &self,
-        transaction_exists: Arc<dyn TransactionExists>,
-        outpoint_spent: Arc<dyn OutpointSpent>,
-    ) -> MonitorTransition {
-        MonitorTransition(Arc::new(RwLock::new(Some(self.0.clone().check_payment(
-            |txid| {
-                transaction_exists
-                    .callback(txid.to_string())
-                    .and_then(|buf| buf.map(try_deserialize_tx).transpose())
-                    .map_err(|e| ImplementationError::new(e).into())
-            },
-            |outpoint| {
-                outpoint_spent
-                    .callback(PlainOutPoint::from(outpoint))
-                    .map_err(|e| ImplementationError::new(e).into())
-            },
-        )))))
+    pub fn monitor(&self, transaction_exists: Arc<dyn TransactionExists>) -> MonitorTransition {
+        MonitorTransition(Arc::new(RwLock::new(Some(self.0.clone().check_payment(|txid| {
+            transaction_exists
+                .callback(txid.to_string())
+                .and_then(|buf| buf.map(try_deserialize_tx).transpose())
+                .map_err(|e| ImplementationError::new(e).into())
+        })))))
     }
 }
 
