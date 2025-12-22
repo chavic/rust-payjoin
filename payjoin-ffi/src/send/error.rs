@@ -22,6 +22,18 @@ impl From<send::BuildSenderError> for BuildSenderError {
     fn from(value: send::BuildSenderError) -> Self { BuildSenderError { msg: value.to_string() } }
 }
 
+/// Primitive input errors surfaced at the sender FFI boundary.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum PrimitiveInputError {
+    /// The provided PSBT string could not be parsed.
+    #[error("Invalid PSBT: {0}")]
+    InvalidPsbt(String),
+}
+
+impl From<PsbtParseError> for PrimitiveInputError {
+    fn from(value: PsbtParseError) -> Self { PrimitiveInputError::InvalidPsbt(value.to_string()) }
+}
+
 /// Error returned when request could not be created.
 ///
 /// This error can currently only happen due to programmer mistake.
