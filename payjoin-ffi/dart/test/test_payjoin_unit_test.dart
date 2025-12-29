@@ -152,5 +152,12 @@ void main() {
         reason: "persistence should return a reply key",
       );
     });
+
+    test("Validation sender builder rejects bad psbt", () {
+      expect(
+        () => payjoin.SenderBuilder("not-a-psbt", "bitcoin:12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX"),
+        throwsA(isA<payjoin.PrimitiveInputError>()),
+      );
+    });
   });
 }
