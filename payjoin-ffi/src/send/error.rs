@@ -34,6 +34,15 @@ impl From<PsbtParseError> for PrimitiveInputError {
     fn from(value: PsbtParseError) -> Self { PrimitiveInputError::InvalidPsbt(value.to_string()) }
 }
 
+/// Raised when primitive inputs provided to the sender are malformed or when sender build fails.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum SenderPrimitiveError {
+    #[error(transparent)]
+    Input(PrimitiveInputError),
+    #[error(transparent)]
+    Build(Arc<BuildSenderError>),
+}
+
 /// Error returned when request could not be created.
 ///
 /// This error can currently only happen due to programmer mistake.
