@@ -1400,6 +1400,9 @@ pub mod test {
             state: unchecked_proposal_v2_from_test_vector(),
             session_context: SHARED_CONTEXT.clone(),
         };
+        // NOTE: avoid wrapping this in a `|| { ... }` closure that returns `Result<_, PersistedError<...>>`.
+        // On newer nightlies, clippy's `result_large_err` lint (and CI runs clippy with `-D warnings`)
+        // can turn that pattern into a hard error because the `Err` variant is very large.
         let error = receiver
             .clone()
             .check_broadcast_suitability(None, |_| Err("mock error".into()))

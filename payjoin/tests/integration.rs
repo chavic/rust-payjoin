@@ -424,6 +424,9 @@ mod integration {
                 let proposal = proposal.assume_interactive_receiver().save(&persister)?;
 
                 // Generate replyable error
+                // NOTE: avoid wrapping this `.save(..)` chain in a `|| ...` closure returning
+                // `Result<_, PersistedError<...>>`. On newer nightlies, clippy's `result_large_err` lint
+                // (and CI runs clippy with `-D warnings`) can hard-error because the `Err` variant is huge.
                 let server_error = proposal
                     .clone()
                     .check_inputs_not_owned(&mut |_| Ok(true))
