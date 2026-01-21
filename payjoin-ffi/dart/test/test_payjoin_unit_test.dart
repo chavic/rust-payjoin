@@ -50,6 +50,54 @@ class InMemorySenderPersister implements payjoin.JsonSenderSessionPersister {
   }
 }
 
+class InMemoryReceiverPersisterAsync
+    implements payjoin.JsonReceiverSessionPersisterAsync {
+  final String id;
+  final List<String> events = [];
+  bool closed = false;
+
+  InMemoryReceiverPersisterAsync(this.id);
+
+  @override
+  Future<void> save(String event) async {
+    events.add(event);
+  }
+
+  @override
+  Future<List<String>> load() async {
+    return events;
+  }
+
+  @override
+  Future<void> close() async {
+    closed = true;
+  }
+}
+
+class InMemorySenderPersisterAsync
+    implements payjoin.JsonSenderSessionPersisterAsync {
+  final String id;
+  final List<String> events = [];
+  bool closed = false;
+
+  InMemorySenderPersisterAsync(this.id);
+
+  @override
+  Future<void> save(String event) async {
+    events.add(event);
+  }
+
+  @override
+  Future<List<String>> load() async {
+    return events;
+  }
+
+  @override
+  Future<void> close() async {
+    closed = true;
+  }
+}
+
 void main() {
   group('Test URIs', () {
     test('Test todo url encoded', () {
@@ -150,6 +198,71 @@ void main() {
         result,
         isA<payjoin.WithReplyKey>(),
         reason: "persistence should return a reply key",
+      );
+    });
+  });
+
+  group("Test Async Persistence", () {
+    test("Test receiver async persistence", () async {
+      var persister = InMemoryReceiverPersisterAsync("1");
+      var transition = payjoin.ReceiverBuilder(
+        "tb1q6d3a2w975yny0asuvd9a67ner4nks58ff0q8g4",
+        "https://example.com",
+        payjoin.OhttpKeys.decode(
+          Uint8List.fromList(
+            hex.decode(
+              "01001604ba48c49c3d4a92a3ad00ecc63a024da10ced02180c73ec12d8a7ad2cc91bb483824fe2bee8d28bfe2eb2fc6453bc4d31cd851e8a6540e86c5382af588d370957000400010003",
+            ),
+          ),
+        ),
+      ).build();
+
+      // Use saveAsync instead of save
+      await transition.saveAsync(persister);
+
+      expect(persister.events.length, 1);
+      expect(persister.closed, false);
+
+      // Test async replay
+      final result = await payjoin.replayReceiverEventLogAsync(persister);
+      expect(
+        result,
+        isA<payjoin.ReplayResult>(),
+        reason: "async persistence should return a replay result",
+      );
+    });
+
+    test("Test sender async persistence", () async {
+      // Create a receiver to get the pj uri (using sync persister for setup)
+      var receiver_persister = InMemoryReceiverPersister("1");
+      var receiver = payjoin.ReceiverBuilder(
+        "2MuyMrZHkbHbfjudmKUy45dU4P17pjG2szK",
+        "https://example.com",
+        payjoin.OhttpKeys.decode(
+          Uint8List.fromList(
+            hex.decode(
+              "01001604ba48c49c3d4a92a3ad00ecc63a024da10ced02180c73ec12d8a7ad2cc91bb483824fe2bee8d28bfe2eb2fc6453bc4d31cd851e8a6540e86c5382af588d370957000400010003",
+            ),
+          ),
+        ),
+      ).build().save(receiver_persister);
+      var uri = receiver.pjUri();
+
+      // Test async sender persistence
+      var sender_persister = InMemorySenderPersisterAsync("1");
+      var psbt =
+          "cHNidP8BAHMCAAAAAY8nutGgJdyYGXWiBEb45Hoe9lWGbkxh/6bNiOJdCDuDAAAAAAD+////AtyVuAUAAAAAF6kUHehJ8GnSdBUOOv6ujXLrWmsJRDCHgIQeAAAAAAAXqRR3QJbbz0hnQ8IvQ0fptGn+votneofTAAAAAAEBIKgb1wUAAAAAF6kU3k4ekGHKWRNbA1rV5tR5kEVDVNCHAQcXFgAUx4pFclNVgo1WWAdN1SYNX8tphTABCGsCRzBEAiB8Q+A6dep+Rz92vhy26lT0AjZn4PRLi8Bf9qoB/CMk0wIgP/Rj2PWZ3gEjUkTlhDRNAQ0gXwTO7t9n+V14pZ6oljUBIQMVmsAaoNWHVMS02LfTSe0e388LNitPa1UQZyOihY+FFgABABYAFEb2Giu6c4KO5YW0pfw3lGp9jMUUAAA=";
+      var transition = payjoin.SenderBuilder(psbt, uri).buildRecommended(1000);
+
+      // Use saveAsync instead of save
+      final result = await transition.saveAsync(sender_persister);
+
+      expect(sender_persister.events.length, 1);
+      expect(sender_persister.closed, false);
+      expect(
+        result,
+        isA<payjoin.WithReplyKey>(),
+        reason: "async persistence should return a reply key",
       );
     });
   });
