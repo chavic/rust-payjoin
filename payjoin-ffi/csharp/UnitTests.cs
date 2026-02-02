@@ -42,7 +42,7 @@ public class UriTests
     }
 }
 
-public class InMemoryReceiverPersister : IJsonReceiverSessionPersister
+public class InMemoryReceiverPersister : JsonReceiverSessionPersister
 {
     private List<string> _events = new();
     private bool _closed = false;
@@ -63,7 +63,7 @@ public class InMemoryReceiverPersister : IJsonReceiverSessionPersister
     }
 }
 
-public class InMemorySenderPersister : IJsonSenderSessionPersister
+public class InMemorySenderPersister : JsonSenderSessionPersister
 {
     private List<string> _events = new();
     private bool _closed = false;
