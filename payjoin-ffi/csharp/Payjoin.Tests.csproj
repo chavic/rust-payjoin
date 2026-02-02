@@ -17,4 +17,10 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Include native library - copied to output directory for testing -->
+  <Target Name="CopyNativeLibraries" AfterTargets="Build">
+    <Copy SourceFiles="lib/libpayjoin_ffi.so" DestinationFolder="$(TargetDir)" Condition="Exists('lib/libpayjoin_ffi.so')" />
+    <Copy SourceFiles="lib/libpayjoin_ffi.dylib" DestinationFolder="$(TargetDir)" Condition="Exists('lib/libpayjoin_ffi.dylib')" />
+  </Target>
+
 </Project>
