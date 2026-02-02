@@ -13,3 +13,4 @@ obj/
 # NuGet
 *.nupkg
 packages/
+/lib/*.so
