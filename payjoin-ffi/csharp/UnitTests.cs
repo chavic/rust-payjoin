@@ -52,9 +52,9 @@ public class InMemoryReceiverPersister : JsonReceiverSessionPersister
         _events.Add(@event);
     }
 
-    public List<string> Load()
+    public string[] Load()
     {
-        return new List<string>(_events);
+        return _events.ToArray();
     }
 
     public void Close()
@@ -73,9 +73,9 @@ public class InMemorySenderPersister : JsonSenderSessionPersister
         _events.Add(@event);
     }
 
-    public List<string> Load()
+    public string[] Load()
     {
-        return new List<string>(_events);
+        return _events.ToArray();
     }
 
     public void Close()
@@ -103,7 +103,7 @@ public class PersistenceTests
     {
         var persister = new InMemoryReceiverPersister();
         var address = "tb1q6d3a2w975yny0asuvd9a67ner4nks58ff0q8g4";
-        var ohttpKeys = OhttpKeys.Decode(OhttpKeysData.ToList());
+        var ohttpKeys = OhttpKeys.Decode(OhttpKeysData);
 
         var builder = new ReceiverBuilder(address, "https://example.com", ohttpKeys);
         var transition = builder.Build();
@@ -120,7 +120,7 @@ public class PersistenceTests
     {
         var receiverPersister = new InMemoryReceiverPersister();
         var address = "2MuyMrZHkbHbfjudmKUy45dU4P17pjG2szK";
-        var ohttpKeys = OhttpKeys.Decode(OhttpKeysData.ToList());
+        var ohttpKeys = OhttpKeys.Decode(OhttpKeysData);
 
         var receiver = new ReceiverBuilder(address, "https://example.com", ohttpKeys)
             .Build()
@@ -155,7 +155,7 @@ public class ValidationTests
     [Fact]
     public void ReceiverBuilderRejectsBadAddress()
     {
-        var ohttpKeys = OhttpKeys.Decode(OhttpKeysData.ToList());
+        var ohttpKeys = OhttpKeys.Decode(OhttpKeysData);
         
         Assert.Throws<Exception>(() =>
         {
@@ -172,7 +172,7 @@ public class ValidationTests
                 new PlainOutPoint("deadbeef", 0),
                 new byte[] {},
                 0,
-                new List<List<byte>>()
+                new byte[][] {}
             );
             var psbtIn = new PlainPsbtInput(null, null, null);
             new InputPair(txin, psbtIn, null);
