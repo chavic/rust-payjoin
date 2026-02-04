@@ -21,18 +21,14 @@ cd "$SCRIPT_DIR/../.."
 echo "Generating payjoin C#..."
 cargo build --features _test-utils --profile dev -j2
 
-# Use uniffi-bindgen-cs. Default to local checkout of the branch with the foreign-handle fix.
-UNIFFI_CS_REPO=${UNIFFI_CS_REPO:-https://github.com/NordSecurity/uniffi-bindgen-cs.git}
+# Use uniffi-bindgen-cs. Prefer a globally installed binary from the fork/branch we track.
+UNIFFI_CS=${UNIFFI_CS:-$HOME/.cargo/bin/uniffi-bindgen-cs}
+UNIFFI_CS_REPO=${UNIFFI_CS_REPO:-https://github.com/chavic/uniffi-bindgen-cs.git}
 UNIFFI_CS_BRANCH=${UNIFFI_CS_BRANCH:-chavic/external-types-support}
-UNIFFI_CS=${UNIFFI_CS:-$HOME/Workspace/uniffi-bindgen-cs/target/debug/uniffi-bindgen-cs}
 
 if [[ ! -x "$UNIFFI_CS" ]]; then
-    echo "Building uniffi-bindgen-cs from $UNIFFI_CS_REPO#$UNIFFI_CS_BRANCH..."
-    tmpdir=$(mktemp -d)
-    git clone --branch "$UNIFFI_CS_BRANCH" --depth 1 "$UNIFFI_CS_REPO" "$tmpdir"
-    (cd "$tmpdir" && cargo build --release)
-    UNIFFI_CS="$tmpdir/target/release/uniffi-bindgen-cs"
-    echo "Built uniffi-bindgen-cs at $UNIFFI_CS"
+    echo "Installing uniffi-bindgen-cs from $UNIFFI_CS_REPO#$UNIFFI_CS_BRANCH..."
+    cargo install --git "$UNIFFI_CS_REPO" --branch "$UNIFFI_CS_BRANCH" --locked uniffi-bindgen-cs
 fi
 
 # Clean output directory to prevent duplicate definitions
