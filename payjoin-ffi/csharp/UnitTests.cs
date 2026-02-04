@@ -45,7 +45,6 @@ public class UriTests
 public class InMemoryReceiverPersister : JsonReceiverSessionPersister
 {
     private List<string> _events = new();
-    private bool _closed = false;
 
     public void Save(string @event)
     {
@@ -59,14 +58,13 @@ public class InMemoryReceiverPersister : JsonReceiverSessionPersister
 
     public void Close()
     {
-        _closed = true;
+        // no-op for tests
     }
 }
 
 public class InMemorySenderPersister : JsonSenderSessionPersister
 {
     private List<string> _events = new();
-    private bool _closed = false;
 
     public void Save(string @event)
     {
@@ -80,7 +78,7 @@ public class InMemorySenderPersister : JsonSenderSessionPersister
 
     public void Close()
     {
-        _closed = true;
+        // no-op for tests
     }
 }
 
@@ -134,7 +132,10 @@ public class PersistenceTests
             .BuildRecommended(1000)
             .Save(senderPersister);
 
-        Assert.NotNull(withReplyKey);
+        var replayed = PayjoinMethods.ReplaySenderEventLog(senderPersister);
+        var state = replayed.State();
+
+        Assert.IsType<SendSession.WithReplyKey>(state);
     }
 }
 
@@ -157,7 +158,7 @@ public class ValidationTests
     {
         var ohttpKeys = OhttpKeys.Decode(OhttpKeysData);
         
-        Assert.Throws<Exception>(() =>
+        Assert.Throws<ReceiverBuilderException.InvalidAddress>(() =>
         {
             new ReceiverBuilder("not-an-address", "https://example.com", ohttpKeys);
         });
@@ -166,7 +167,7 @@ public class ValidationTests
     [Fact]
     public void InputPairRejectsInvalidOutpoint()
     {
-        Assert.Throws<Exception>(() =>
+        Assert.Throws<InputPairException.InvalidOutPoint>(() =>
         {
             var txin = new PlainTxIn(
                 new PlainOutPoint("deadbeef", 0),
