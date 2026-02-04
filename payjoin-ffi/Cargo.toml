@@ -40,6 +40,10 @@ url = "2.5.4"
 [package.metadata.cargo-machete]
 ignored = ["getrandom"]
 
+[package.metadata.uniffi-bindgen-cs]
+git = "https://github.com/NordSecurity/uniffi-bindgen-cs"
+branch = "chavic/external-types-support"
+
 [dev-dependencies]
 bdk = { version = "0.29.0", features = [
   "all-keys",
