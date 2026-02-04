@@ -23,12 +23,10 @@ cargo build --features _test-utils --profile dev -j2
 
 # Use uniffi-bindgen-cs. Prefer a globally installed binary from the fork/branch we track.
 UNIFFI_CS=${UNIFFI_CS:-$HOME/.cargo/bin/uniffi-bindgen-cs}
-UNIFFI_CS_REPO=${UNIFFI_CS_REPO:-https://github.com/chavic/uniffi-bindgen-cs.git}
-UNIFFI_CS_BRANCH=${UNIFFI_CS_BRANCH:-chavic/external-types-support}
 
 if [[ ! -x "$UNIFFI_CS" ]]; then
-    echo "Installing uniffi-bindgen-cs from $UNIFFI_CS_REPO#$UNIFFI_CS_BRANCH..."
-    cargo install --git "$UNIFFI_CS_REPO" --branch "$UNIFFI_CS_BRANCH" --locked uniffi-bindgen-cs
+    echo "Installing uniffi-bindgen-cs (patched via workspace Cargo.toml patch)..."
+    cargo install --locked uniffi-bindgen-cs
 fi
 
 # Clean output directory to prevent duplicate definitions

@@ -16,6 +16,7 @@ payjoin = { path = "payjoin" }
 payjoin-directory = { path = "payjoin-directory" }
 payjoin-service = { path = "payjoin-service" }
 payjoin-test-utils = { path = "payjoin-test-utils" }
+uniffi-bindgen-cs = { git = "https://github.com/chavic/uniffi-bindgen-cs.git", branch = "chavic/external-types-support" }
 
 [profile.crane]
 inherits = "test"
