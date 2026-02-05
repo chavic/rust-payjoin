@@ -21,14 +21,12 @@ cd "$SCRIPT_DIR/../.."
 echo "Generating payjoin C#..."
 cargo build --features _test-utils --profile dev -j2
 
-# Use uniffi-bindgen-cs. Prefer a globally installed binary from the fork/branch we track.
+# Use uniffi-bindgen-cs from the fork/branch we track, installed via cargo (no manual clone).
 UNIFFI_CS=${UNIFFI_CS:-$HOME/.cargo/bin/uniffi-bindgen-cs}
-UNIFFI_CS_REPO=${UNIFFI_CS_REPO:-https://github.com/chavic/uniffi-bindgen-cs.git}
-UNIFFI_CS_BRANCH=${UNIFFI_CS_BRANCH:-chavic/external-types-support}
 
 if [[ ! -x "$UNIFFI_CS" ]]; then
-    echo "Installing uniffi-bindgen-cs from $UNIFFI_CS_REPO#$UNIFFI_CS_BRANCH..."
-    cargo install --git "$UNIFFI_CS_REPO" --branch "$UNIFFI_CS_BRANCH" --locked uniffi-bindgen-cs
+    echo "Installing uniffi-bindgen-cs from https://github.com/chavic/uniffi-bindgen-cs.git#chavic/external-types-support..."
+    cargo install --git https://github.com/chavic/uniffi-bindgen-cs.git --branch chavic/external-types-support --locked uniffi-bindgen-cs
 fi
 
 # Clean output directory to prevent duplicate definitions
