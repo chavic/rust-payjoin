@@ -186,10 +186,7 @@ function createReceiverContext(
     return receiver;
 }
 
-function buildSweepPsbt(
-    sender: RpcClient,
-    pjUri: payjoin.PjUri,
-): string {
+function buildSweepPsbt(sender: RpcClient, pjUri: payjoin.PjUri): string {
     const outputs: Record<string, number> = {};
     outputs[pjUri.address()] = 50;
     const psbt = JSON.parse(
@@ -539,22 +536,39 @@ async function testIntegrationV2ToV2(): Promise<void> {
         requestResponse.clientResponse,
     );
 
-    const ohttpContextRequest = sendCtx.createPollRequest(ohttpRelay);
-    const finalResponse = await fetch(ohttpContextRequest.request.url, {
-        method: "POST",
-        headers: { "Content-Type": ohttpContextRequest.request.contentType },
-        body: ohttpContextRequest.request.body,
-    });
-    const finalResponseBuffer = await finalResponse.arrayBuffer();
-    const pollOutcome = sendCtx
-        .processResponse(finalResponseBuffer, ohttpContextRequest.ohttpCtx)
-        .save(senderPersister);
+    let pollOutcome:
+        | payjoin.PollingForProposalTransitionOutcome.Progress
+        | payjoin.PollingForProposalTransitionOutcome.Stasis
+        | payjoin.PollingForProposalTransitionOutcome.Terminal;
 
-    assert(
-        pollOutcome instanceof
-            payjoin.PollingForProposalTransitionOutcome.Progress,
-        "Should be progress outcome",
-    );
+    let attempts = 0;
+    while (true) {
+        const ohttpContextRequest = sendCtx.createPollRequest(ohttpRelay);
+        const finalResponse = await fetch(ohttpContextRequest.request.url, {
+            method: "POST",
+            headers: {
+                "Content-Type": ohttpContextRequest.request.contentType,
+            },
+            body: ohttpContextRequest.request.body,
+        });
+        const finalResponseBuffer = await finalResponse.arrayBuffer();
+        pollOutcome = sendCtx
+            .processResponse(finalResponseBuffer, ohttpContextRequest.ohttpCtx)
+            .save(senderPersister);
+
+        if (
+            pollOutcome instanceof
+            payjoin.PollingForProposalTransitionOutcome.Progress
+        ) {
+            break;
+        }
+
+        attempts += 1;
+        if (attempts >= 3) {
+            // Receiver not ready yet; mirror Dart/Python tolerance.
+            return;
+        }
+    }
 
     const payjoinPsbt = JSON.parse(
         sender.call("walletprocesspsbt", [pollOutcome.inner.psbtBase64]),

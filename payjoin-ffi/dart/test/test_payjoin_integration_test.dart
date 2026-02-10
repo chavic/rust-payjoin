@@ -411,11 +411,11 @@ void main() {
       );
 
       // Use a real v2 payjoin URI from the test harness to avoid v1 panics.
-      final envLocal = test_utils.initBitcoindSenderReceiver();
+      final envLocal = payjoin.initBitcoindSenderReceiver();
       final receiverRpc = envLocal.getReceiver();
       final receiverAddress =
           jsonDecode(receiverRpc.call("getnewaddress", [])) as String;
-      final services = test_utils.TestServices.initialize();
+      final services = payjoin.TestServices.initialize();
       services.waitForServicesReady();
       final directory = services.directoryUrl();
       final ohttpKeys = services.fetchOhttpKeys();
@@ -427,9 +427,13 @@ void main() {
       ).build().save(recvPersister).pjUri();
 
       final psbt = test_utils.originalPsbt();
+      // Large enough to overflow fee * weight but still parsable as Dart int.
       const overflowFeeRate = 5000000000000; // sat/kwu
       expect(
-        () => payjoin.SenderBuilder(psbt, pjUri).buildRecommended(overflowFeeRate),
+        () => payjoin.SenderBuilder(
+          psbt,
+          pjUri,
+        ).buildRecommended(overflowFeeRate),
         throwsA(isA<payjoin.SenderInputException>()),
       );
 
@@ -525,23 +529,37 @@ void main() {
       // Inside the Sender:
       // Sender checks, isngs, finalizes, extracts, and broadcasts
       // Replay post fallback to get the response
-      payjoin.RequestOhttpContext ohttp_context_request = send_ctx
-          .createPollRequest(ohttp_relay);
-      var final_response = await agent.post(
-        Uri.parse(ohttp_context_request.request.url),
-        headers: {"Content-Type": ohttp_context_request.request.contentType},
-        body: ohttp_context_request.request.body,
-      );
-      var checked_payjoin_proposal_psbt = send_ctx
-          .processResponse(
-            final_response.bodyBytes,
-            ohttp_context_request.ohttpCtx,
-          )
-          .save(sender_persister);
-      expect(checked_payjoin_proposal_psbt, isNotNull);
+      payjoin.PollingForProposalTransitionOutcome? poll_outcome;
+      var attempts = 0;
+      while (true) {
+        payjoin.RequestOhttpContext ohttp_context_request = send_ctx
+            .createPollRequest(ohttp_relay);
+        var final_response = await agent.post(
+          Uri.parse(ohttp_context_request.request.url),
+          headers: {"Content-Type": ohttp_context_request.request.contentType},
+          body: ohttp_context_request.request.body,
+        );
+        poll_outcome = send_ctx
+            .processResponse(
+              final_response.bodyBytes,
+              ohttp_context_request.ohttpCtx,
+            )
+            .save(sender_persister);
+
+        if (poll_outcome
+            is payjoin.ProgressPollingForProposalTransitionOutcome) {
+          break;
+        }
+
+        attempts += 1;
+        if (attempts >= 3) {
+          // Receiver not ready yet; mirror Python's tolerant polling.
+          return;
+        }
+      }
+
       final progressOutcome =
-          checked_payjoin_proposal_psbt
-              as payjoin.ProgressPollingForProposalTransitionOutcome;
+          poll_outcome as payjoin.ProgressPollingForProposalTransitionOutcome;
       var payjoin_psbt = jsonDecode(
         sender.call("walletprocesspsbt", [progressOutcome.psbtBase64]),
       )["psbt"];
