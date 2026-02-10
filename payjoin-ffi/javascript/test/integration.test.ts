@@ -1,5 +1,9 @@
 import { payjoin, uniffiInitAsync } from "../dist/index.js";
-import * as testUtils from "../test-utils/index.js";
+import {
+    RpcClient,
+    TestServices,
+    initBitcoindSenderReceiver,
+} from "../test-utils/index.js";
 import assert from "assert";
 
 interface Utxo {
@@ -15,7 +19,7 @@ class InMemoryReceiverPersister
     private id: string;
     private events: string[] = [];
     private closed: boolean = false;
-    public connection?: testUtils.RpcClient;
+    public connection?: RpcClient;
 
     constructor(id: string) {
         this.id = id;
@@ -57,9 +61,9 @@ class InMemorySenderPersister implements payjoin.JsonSenderSessionPersister {
 }
 
 class MempoolAcceptanceCallback implements payjoin.CanBroadcast {
-    private connection: testUtils.RpcClient;
+    private connection: RpcClient;
 
-    constructor(connection: testUtils.RpcClient) {
+    constructor(connection: RpcClient) {
         this.connection = connection;
     }
 
@@ -78,9 +82,9 @@ class MempoolAcceptanceCallback implements payjoin.CanBroadcast {
 }
 
 class IsScriptOwnedCallback implements payjoin.IsScriptOwned {
-    private connection: testUtils.RpcClient;
+    private connection: RpcClient;
 
-    constructor(connection: testUtils.RpcClient) {
+    constructor(connection: RpcClient) {
         this.connection = connection;
     }
 
@@ -144,9 +148,9 @@ class IsScriptOwnedCallback implements payjoin.IsScriptOwned {
 }
 
 class CheckInputsNotSeenCallback implements payjoin.IsOutputKnown {
-    private connection: testUtils.RpcClient;
+    private connection: RpcClient;
 
-    constructor(connection: testUtils.RpcClient) {
+    constructor(connection: RpcClient) {
         this.connection = connection;
     }
 
@@ -156,9 +160,9 @@ class CheckInputsNotSeenCallback implements payjoin.IsOutputKnown {
 }
 
 class ProcessPsbtCallback implements payjoin.ProcessPsbt {
-    private connection: testUtils.RpcClient;
+    private connection: RpcClient;
 
-    constructor(connection: testUtils.RpcClient) {
+    constructor(connection: RpcClient) {
         this.connection = connection;
     }
 
@@ -183,7 +187,7 @@ function createReceiverContext(
 }
 
 function buildSweepPsbt(
-    sender: testUtils.RpcClient,
+    sender: RpcClient,
     pjUri: payjoin.PjUri,
 ): string {
     const outputs: Record<string, number> = {};
@@ -210,7 +214,7 @@ function buildSweepPsbt(
     ).psbt;
 }
 
-function getInputs(rpcConnection: testUtils.RpcClient): payjoin.InputPair[] {
+function getInputs(rpcConnection: RpcClient): payjoin.InputPair[] {
     const utxos: Utxo[] = JSON.parse(rpcConnection.call("listunspent", []));
     const inputs: payjoin.InputPair[] = [];
     for (const utxo of utxos) {
@@ -451,7 +455,7 @@ async function processReceiverProposal(
 }
 
 async function testIntegrationV2ToV2(): Promise<void> {
-    const env = testUtils.initBitcoindSenderReceiver();
+    const env = initBitcoindSenderReceiver();
     const bitcoind = env.getBitcoind();
     const receiver = env.getReceiver();
     const sender = env.getSender();
@@ -459,7 +463,7 @@ async function testIntegrationV2ToV2(): Promise<void> {
     const receiverAddressJson = receiver.call("getnewaddress", []);
     const receiverAddress = JSON.parse(receiverAddressJson);
 
-    const services = new testUtils.TestServices();
+    const services = new TestServices();
     const directory = services.directoryUrl();
     const ohttpRelay = services.ohttpRelayUrl();
     services.waitForServicesReady();
