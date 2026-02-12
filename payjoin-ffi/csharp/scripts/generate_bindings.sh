@@ -24,9 +24,9 @@ cargo build --features _test-utils --profile dev -j2
 # Use uniffi-bindgen-cs from the fork/branch we track, installed via cargo (no manual clone).
 UNIFFI_CS=${UNIFFI_CS:-$HOME/.cargo/bin/uniffi-bindgen-cs}
 
-if [[ ! -x "$UNIFFI_CS" ]]; then
-    echo "Installing uniffi-bindgen-cs from https://github.com/chavic/uniffi-bindgen-cs.git#chavic/external-types-support..."
-    cargo install --git https://github.com/chavic/uniffi-bindgen-cs.git --branch chavic/external-types-support --locked uniffi-bindgen-cs
+if [[ ! -x $UNIFFI_CS ]]; then
+    echo "Installing uniffi-bindgen-cs from https://github.com/chavic/uniffi-bindgen-cs.git#chavic/csharp-handle-fix..."
+    cargo install --git https://github.com/chavic/uniffi-bindgen-cs.git --branch chavic/csharp-handle-fix --locked uniffi-bindgen-cs
 fi
 
 # Clean output directory to prevent duplicate definitions
