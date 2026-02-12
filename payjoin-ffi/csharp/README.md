@@ -28,6 +28,7 @@ dotnet test
 ## Configuration
 
 You can specify the path to `uniffi-bindgen-cs` via environment variable:
+
 ```shell
 export UNIFFI_CS=/path/to/uniffi-bindgen-cs
 dotnet build
