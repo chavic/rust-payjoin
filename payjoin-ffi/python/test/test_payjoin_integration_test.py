@@ -89,13 +89,13 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
             redeem_script=None,
             witness_script=None,
         )
-        with self.assertRaises(InputPairError) as ctx:
+        amount_oob_variant = getattr(InputPairError, "AmountOutOfRange", InputPairError)
+        with self.assertRaises(amount_oob_variant) as ctx:
             InputPair(txin=txin, psbtin=psbt_in, expected_weight=None)
-        self.assertTrue(
-            "Amount out of range" in str(ctx.exception)
-            or "amount_sat=" in str(ctx.exception)
-            or "AmountOutOfRange" in str(ctx.exception)
-        )
+        # Cope with bindings that don't expose nested variants.
+        self.assertIsInstance(ctx.exception, InputPairError)
+        if amount_oob_variant is not InputPairError:
+            self.assertIsInstance(ctx.exception, amount_oob_variant)
 
         # Use a real v2 payjoin URI from the receiver harness to avoid the v1 panic path.
         receiver_address = json.loads(self.receiver.call("getnewaddress", []))
@@ -108,21 +108,20 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
             receiver_address, directory, ohttp_keys, recv_persister
         ).pj_uri()
 
-        with self.assertRaises(SenderInputError) as ctx:
+        sender_prim_variant = getattr(SenderInputError, "Primitive", SenderInputError)
+        with self.assertRaises(sender_prim_variant) as ctx:
             SenderBuilder(original_psbt(), pj_uri).build_recommended(2**64 - 1)
-        self.assertTrue(
-            "Fee rate out of range" in str(ctx.exception)
-            or "FeeRateOutOfRange" in str(ctx.exception)
-            or "sat/kwu" in str(ctx.exception)
-        )
+        if sender_prim_variant is not SenderInputError:
+            self.assertIsInstance(ctx.exception, sender_prim_variant)
+        fee_rate_variant = getattr(PrimitiveError, "FeeRateOutOfRange", PrimitiveError)
+        self.assertIsInstance(ctx.exception.__cause__, fee_rate_variant)
 
-        with self.assertRaises(PrimitiveError) as ctx:
+        prim_amount_variant = getattr(PrimitiveError, "AmountOutOfRange", PrimitiveError)
+        with self.assertRaises(prim_amount_variant) as ctx:
             pj_uri.set_amount_sats(too_large_amount)
-        self.assertTrue(
-            "Amount out of range" in str(ctx.exception)
-            or "amount_sat=" in str(ctx.exception)
-            or "AmountOutOfRange" in str(ctx.exception)
-        )
+        self.assertIsInstance(ctx.exception, PrimitiveError)
+        if prim_amount_variant is not PrimitiveError:
+            self.assertIsInstance(ctx.exception, prim_amount_variant)
 
     async def process_receiver_proposal(
         self,
