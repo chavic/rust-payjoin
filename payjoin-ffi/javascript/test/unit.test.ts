@@ -243,10 +243,6 @@ describe("Async Persistence tests", () => {
             ohttpKeys,
         );
         const built = builder.build();
-        if (typeof built.saveAsync !== "function") {
-            test.skip("saveAsync not exposed in JS binding yet");
-            return;
-        }
         await built.saveAsync(persister);
 
         const result = await payjoin.replayReceiverEventLogAsync(persister);
@@ -280,23 +276,15 @@ describe("Async Persistence tests", () => {
             "https://example.com",
             ohttpKeys,
         ).build();
-        if (typeof receiverBuilder.saveAsync !== "function") {
-            test.skip("saveAsync not exposed in JS binding yet");
-            return;
-        }
         const receiver = await receiverBuilder.saveAsync(persister);
         const uri = receiver.pjUri();
 
         const senderPersister = new InMemorySenderPersisterAsync(1);
         const psbt =
             "cHNidP8BAHMCAAAAAY8nutGgJdyYGXWiBEb45Hoe9lWGbkxh/6bNiOJdCDuDAAAAAAD+////AtyVuAUAAAAAF6kUHehJ8GnSdBUOOv6ujXLrWmsJRDCHgIQeAAAAAAAXqRR3QJbbz0hnQ8IvQ0fptGn+votneofTAAAAAAEBIKgb1wUAAAAAF6kU3k4ekGHKWRNbA1rV5tR5kEVDVNCHAQcXFgAUx4pFclNVgo1WWAdN1SYNX8tphTABCGsCRzBEAiB8Q+A6dep+Rz92vhy26lT0AjZn4PRLi8Bf9qoB/CMk0wIgP/Rj2PWZ3gEjUkTlhDRNAQ0gXwTO7t9n+V14pZ6oljUBIQMVmsAaoNWHVMS02LfTSe0e388LNitPa1UQZyOihY+FFgABABYAFEb2Giu6c4KO5YW0pfw3lGp9jMUUAAA=";
-        const senderBuilder = new payjoin.SenderBuilder(psbt, uri)
-            .buildRecommended(BigInt(1000));
-        if (typeof senderBuilder.saveAsync !== "function") {
-            test.skip("saveAsync not exposed in JS binding yet");
-            return;
-        }
-        const withReplyKey = await senderBuilder.saveAsync(senderPersister);
+        const withReplyKey = await new payjoin.SenderBuilder(psbt, uri)
+            .buildRecommended(BigInt(1000))
+            .saveAsync(senderPersister);
 
         assert.ok(withReplyKey, "Sender should be created successfully");
     });
@@ -325,15 +313,6 @@ describe("Validation", () => {
         });
     });
 
-    test("sender builder rejects bad psbt", () => {
-        assert.throws(() => {
-            const uri = payjoin.Uri.parse(
-                "bitcoin:tb1q6d3a2w975yny0asuvd9a67ner4nks58ff0q8g4?pj=https://example.com/pj",
-            ).checkPjSupported();
-            new payjoin.SenderBuilder("not-a-psbt", uri);
-        });
-    });
-
     test("input pair rejects invalid outpoint", () => {
         assert.throws(() => {
             const txin = payjoin.PlainTxIn.create({
@@ -351,6 +330,15 @@ describe("Validation", () => {
                 witnessScript: undefined,
             });
             new payjoin.InputPair(txin, psbtIn, undefined);
+        });
+    });
+
+    test("sender builder rejects bad psbt", () => {
+        assert.throws(() => {
+            const uri = payjoin.Uri.parse(
+                "bitcoin:tb1q6d3a2w975yny0asuvd9a67ner4nks58ff0q8g4?pj=https://example.com/pj",
+            ).checkPjSupported();
+            new payjoin.SenderBuilder("not-a-psbt", uri);
         });
     });
 });
