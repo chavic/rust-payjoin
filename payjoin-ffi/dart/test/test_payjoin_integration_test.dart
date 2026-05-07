@@ -322,7 +322,7 @@ Future<payjoin.PayjoinProposalReceiveSession> process_unchecked_proposal(
 ) async {
   final unchecked_proposal = proposal
       .checkBroadcastSuitability(
-        minFeeRate: null,
+        minFeeRateSatPerKwu: null,
         canBroadcast: MempoolAcceptanceCallback(receiver),
       )
       .save(persister: recv_persister);
@@ -507,7 +507,7 @@ void main() {
         () => payjoin.SenderBuilder(
           psbt: psbt,
           uri: pjUri,
-        ).buildRecommended(minFeeRate: overflowFeeRate),
+        ).buildRecommended(minFeeRateSatPerKwu: overflowFeeRate),
         throwsA(isA<payjoin.SenderInputException>()),
       );
 
@@ -555,10 +555,10 @@ void main() {
       // Create a funded PSBT (not broadcasted) to address with amount given in the pj_uri
       var pj_uri = session.pjUri();
       var psbt = build_sweep_psbt(sender, pj_uri);
-      payjoin.WithReplyKey req_ctx = payjoin.SenderBuilder(
-        psbt: psbt,
-        uri: pj_uri,
-      ).buildRecommended(minFeeRate: 1000).save(persister: sender_persister);
+      payjoin.WithReplyKey req_ctx =
+          payjoin.SenderBuilder(psbt: psbt, uri: pj_uri)
+              .buildRecommended(minFeeRateSatPerKwu: 1000)
+              .save(persister: sender_persister);
       payjoin.RequestOhttpContext request = req_ctx.createV2PostRequest(
         ohttpRelay: ohttp_relay,
       );

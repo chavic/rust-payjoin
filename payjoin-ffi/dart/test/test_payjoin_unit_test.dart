@@ -189,10 +189,9 @@ void main() {
 
       var sender_persister = InMemorySenderPersister("1");
       var psbt = payjoin.originalPsbt();
-      payjoin.SenderBuilder(
-        psbt: psbt,
-        uri: uri,
-      ).buildRecommended(minFeeRate: 1000).save(persister: sender_persister);
+      payjoin.SenderBuilder(psbt: psbt, uri: uri)
+          .buildRecommended(minFeeRateSatPerKwu: 1000)
+          .save(persister: sender_persister);
       final senderResult = payjoin.replaySenderEventLog(
         persister: sender_persister,
       );
@@ -274,10 +273,9 @@ void main() {
 
       var sender_persister = InMemorySenderPersister("1");
       var psbt = payjoin.originalPsbt();
-      var withReplyKey = payjoin.SenderBuilder(
-        psbt: psbt,
-        uri: uri,
-      ).buildRecommended(minFeeRate: 1000).save(persister: sender_persister);
+      var withReplyKey = payjoin.SenderBuilder(psbt: psbt, uri: uri)
+          .buildRecommended(minFeeRateSatPerKwu: 1000)
+          .save(persister: sender_persister);
       var cancelTransition = withReplyKey.cancel();
       var fallbackTx = cancelTransition.save(persister: sender_persister);
       expect(fallbackTx, isNotNull);
@@ -308,7 +306,7 @@ void main() {
       var sender_persister = InMemorySenderPersisterAsync("1");
       var psbt = payjoin.originalPsbt();
       var withReplyKey = await payjoin.SenderBuilder(psbt: psbt, uri: uri)
-          .buildRecommended(minFeeRate: 1000)
+          .buildRecommended(minFeeRateSatPerKwu: 1000)
           .saveAsync(persister: sender_persister);
       var cancelTransition = withReplyKey.cancel();
       var fallbackTx = await cancelTransition.saveAsync(
@@ -369,7 +367,7 @@ void main() {
       var sender_persister = InMemorySenderPersisterAsync("1");
       var psbt = payjoin.originalPsbt();
       await payjoin.SenderBuilder(psbt: psbt, uri: uri)
-          .buildRecommended(minFeeRate: 1000)
+          .buildRecommended(minFeeRateSatPerKwu: 1000)
           .saveAsync(persister: sender_persister);
       final senderResult = await payjoin.replaySenderEventLogAsync(
         persister: sender_persister,

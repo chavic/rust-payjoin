@@ -493,8 +493,8 @@ impl ReceiverBuilder {
         Ok(Self(self.0.clone().with_amount(amount)))
     }
 
-    pub fn with_expiration(&self, expiration: u64) -> Result<Self, FfiValidationError> {
-        let expiration = validate_expiration_secs(expiration)?;
+    pub fn with_expiration(&self, expiration_secs: u64) -> Result<Self, FfiValidationError> {
+        let expiration = validate_expiration_secs(expiration_secs)?;
         Ok(Self(self.0.clone().with_expiration(expiration)))
     }
 
@@ -715,10 +715,10 @@ pub trait CanBroadcast: Send + Sync {
 impl UncheckedOriginalPayload {
     pub fn check_broadcast_suitability(
         &self,
-        min_fee_rate: Option<u64>,
+        min_fee_rate_sat_per_kwu: Option<u64>,
         can_broadcast: Arc<dyn CanBroadcast>,
     ) -> Result<UncheckedOriginalPayloadTransition, FfiValidationError> {
-        let min_fee_rate = validate_fee_rate_sat_per_kwu_opt(min_fee_rate)?;
+        let min_fee_rate = validate_fee_rate_sat_per_kwu_opt(min_fee_rate_sat_per_kwu)?;
         Ok(UncheckedOriginalPayloadTransition(Arc::new(RwLock::new(Some(
             self.0.clone().check_broadcast_suitability(min_fee_rate, |transaction| {
                 can_broadcast
