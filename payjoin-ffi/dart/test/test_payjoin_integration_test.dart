@@ -222,17 +222,17 @@ List<payjoin.InputPair> get_inputs(payjoin.RpcClient rpc_connection) {
     final amountBtc = utxo["amount"] as num;
     final amountSat = (amountBtc * 100000000).round();
 
-    final txin = payjoin.PlainTxIn(
-      previousOutput: payjoin.PlainOutPoint(txid: txid, vout: vout),
+    final txin = payjoin.TxIn(
+      previousOutput: payjoin.OutPoint(txid: txid, vout: vout),
       scriptSig: Uint8List(0),
       sequence: 0,
       witness: <Uint8List>[],
     );
-    final witnessUtxo = payjoin.PlainTxOut(
+    final witnessUtxo = payjoin.TxOut(
       valueSat: amountSat,
       scriptPubkey: scriptPubKey,
     );
-    final psbt_in = payjoin.PlainPsbtInput(
+    final psbt_in = payjoin.PsbtInput(
       witnessUtxo: witnessUtxo,
       redeemScript: null,
       witnessScript: null,
@@ -438,14 +438,14 @@ void main() {
     test('FFI validation', () async {
       final tooLargeAmount = 21000000 * 100000000 + 1;
       // Invalid outpoint should fail before amount checks.
-      final txinInvalid = payjoin.PlainTxIn(
-        previousOutput: payjoin.PlainOutPoint(txid: "00" * 64, vout: 0),
+      final txinInvalid = payjoin.TxIn(
+        previousOutput: payjoin.OutPoint(txid: "00" * 64, vout: 0),
         scriptSig: Uint8List(0),
         sequence: 0,
         witness: <Uint8List>[],
       );
-      final psbtInDummy = payjoin.PlainPsbtInput(
-        witnessUtxo: payjoin.PlainTxOut(
+      final psbtInDummy = payjoin.PsbtInput(
+        witnessUtxo: payjoin.TxOut(
           valueSat: 1,
           scriptPubkey: Uint8List.fromList([0x6a]),
         ),
@@ -461,18 +461,18 @@ void main() {
         throwsA(isA<payjoin.InputPairException>()),
       );
 
-      final txin = payjoin.PlainTxIn(
+      final txin = payjoin.TxIn(
         // valid 32-byte txid so we exercise amount overflow instead of outpoint parsing
-        previousOutput: payjoin.PlainOutPoint(txid: "00" * 32, vout: 0),
+        previousOutput: payjoin.OutPoint(txid: "00" * 32, vout: 0),
         scriptSig: Uint8List(0),
         sequence: 0,
         witness: <Uint8List>[],
       );
-      final txout = payjoin.PlainTxOut(
+      final txout = payjoin.TxOut(
         valueSat: tooLargeAmount,
         scriptPubkey: Uint8List.fromList([0x6a]),
       );
-      final psbtIn = payjoin.PlainPsbtInput(
+      final psbtIn = payjoin.PsbtInput(
         witnessUtxo: txout,
         redeemScript: null,
         witnessScript: null,

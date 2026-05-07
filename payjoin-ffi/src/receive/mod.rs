@@ -349,14 +349,14 @@ pub struct ReceiverBuilder(payjoin::receive::v2::ReceiverBuilder);
 
 /// Primitive representation of a transaction output for the FFI boundary.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-pub struct PlainTxOut {
+pub struct TxOut {
     /// Amount in satoshis.
     pub value_sat: u64,
     /// Raw scriptPubKey bytes.
     pub script_pubkey: Vec<u8>,
 }
 
-impl PlainTxOut {
+impl TxOut {
     fn into_core(self) -> Result<payjoin::bitcoin::TxOut, FfiValidationError> {
         let value = validate_amount_sat(self.value_sat)?;
         let script_pubkey = validate_script_vec("script_pubkey", self.script_pubkey, false)?;
@@ -364,25 +364,22 @@ impl PlainTxOut {
     }
 }
 
-impl From<payjoin::bitcoin::TxOut> for PlainTxOut {
+impl From<payjoin::bitcoin::TxOut> for TxOut {
     fn from(value: payjoin::bitcoin::TxOut) -> Self {
-        PlainTxOut {
-            value_sat: value.value.to_sat(),
-            script_pubkey: value.script_pubkey.into_bytes(),
-        }
+        TxOut { value_sat: value.value.to_sat(), script_pubkey: value.script_pubkey.into_bytes() }
     }
 }
 
 /// Primitive representation of a transaction input for the FFI boundary.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-pub struct PlainTxIn {
-    pub previous_output: PlainOutPoint,
+pub struct TxIn {
+    pub previous_output: OutPoint,
     pub script_sig: Vec<u8>,
     pub sequence: u32,
     pub witness: Vec<Vec<u8>>,
 }
 
-impl PlainTxIn {
+impl TxIn {
     fn into_core(self) -> Result<payjoin::bitcoin::TxIn, InputPairError> {
         validate_script_bytes("script_sig", &self.script_sig, true)?;
         validate_witness_stack(&self.witness)?;
@@ -398,20 +395,20 @@ impl PlainTxIn {
 
 /// Primitive representation of an outpoint for the FFI boundary.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-pub struct PlainOutPoint {
+pub struct OutPoint {
     /// Hex-encoded txid (big-endian).
     pub txid: String,
     /// Output index.
     pub vout: u32,
 }
 
-impl From<payjoin::bitcoin::OutPoint> for PlainOutPoint {
+impl From<payjoin::bitcoin::OutPoint> for OutPoint {
     fn from(value: payjoin::bitcoin::OutPoint) -> Self {
-        PlainOutPoint { txid: value.txid.to_string(), vout: value.vout }
+        OutPoint { txid: value.txid.to_string(), vout: value.vout }
     }
 }
 
-impl PlainOutPoint {
+impl OutPoint {
     fn into_core(self) -> Result<payjoin::bitcoin::OutPoint, InputPairError> {
         let txid = payjoin::bitcoin::Txid::from_str(&self.txid)
             .map_err(|_| InputPairError::invalid_outpoint(self.txid, self.vout))?;
@@ -421,13 +418,13 @@ impl PlainOutPoint {
 
 /// Primitive representation of a PSBT input for the FFI boundary.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-pub struct PlainPsbtInput {
-    pub witness_utxo: Option<PlainTxOut>,
+pub struct PsbtInput {
+    pub witness_utxo: Option<TxOut>,
     pub redeem_script: Option<Vec<u8>>,
     pub witness_script: Option<Vec<u8>>,
 }
 
-impl PlainPsbtInput {
+impl PsbtInput {
     fn into_core(self) -> Result<payjoin::bitcoin::psbt::Input, InputPairError> {
         let witness_utxo = self
             .witness_utxo
@@ -447,18 +444,18 @@ impl PlainPsbtInput {
 
 /// Primitive representation of a weight measurement.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-pub struct PlainWeight {
+pub struct Weight {
     pub weight_units: u64,
 }
 
-impl PlainWeight {
+impl Weight {
     fn into_core(self) -> Result<payjoin::bitcoin::Weight, FfiValidationError> {
         validate_weight_units(self.weight_units)
     }
 }
 
-impl From<payjoin::bitcoin::Weight> for PlainWeight {
-    fn from(value: payjoin::bitcoin::Weight) -> Self { PlainWeight { weight_units: value.to_wu() } }
+impl From<payjoin::bitcoin::Weight> for Weight {
+    fn from(value: payjoin::bitcoin::Weight) -> Self { Weight { weight_units: value.to_wu() } }
 }
 
 #[uniffi::export]
@@ -830,7 +827,7 @@ impl_save_for_transition!(MaybeInputsSeenTransition, OutputsUnknown);
 
 #[uniffi::export(with_foreign)]
 pub trait IsOutputKnown: Send + Sync {
-    fn callback(&self, outpoint: PlainOutPoint) -> Result<bool, ForeignError>;
+    fn callback(&self, outpoint: OutPoint) -> Result<bool, ForeignError>;
 }
 
 #[uniffi::export]
@@ -842,7 +839,7 @@ impl MaybeInputsSeen {
         MaybeInputsSeenTransition(Arc::new(RwLock::new(Some(
             self.0.clone().check_no_inputs_seen_before(&mut |outpoint| {
                 is_known
-                    .callback(PlainOutPoint::from(*outpoint))
+                    .callback(OutPoint::from(*outpoint))
                     .map_err(|e| ImplementationError::new(e).into())
             }),
         ))))
@@ -930,7 +927,7 @@ impl WantsOutputs {
 
     pub fn replace_receiver_outputs(
         &self,
-        replacement_outputs: Vec<PlainTxOut>,
+        replacement_outputs: Vec<TxOut>,
         drain_script_pubkey: Vec<u8>,
     ) -> Result<WantsOutputs, OutputSubstitutionError> {
         let replacement_outputs = replacement_outputs
@@ -1039,9 +1036,9 @@ pub struct InputPair(payjoin::receive::InputPair);
 impl InputPair {
     #[uniffi::constructor]
     pub fn new(
-        txin: PlainTxIn,
-        psbtin: PlainPsbtInput,
-        expected_weight: Option<PlainWeight>,
+        txin: TxIn,
+        psbtin: PsbtInput,
+        expected_weight: Option<Weight>,
     ) -> Result<Self, InputPairError> {
         let txin = txin.into_core()?;
         let psbtin = psbtin.into_core()?;
@@ -1221,14 +1218,14 @@ impl_save_for_transition!(PayjoinProposalTransition, Monitor);
 
 #[uniffi::export]
 impl PayjoinProposal {
-    pub fn utxos_to_be_locked(&self) -> Vec<PlainOutPoint> {
-        let mut outpoints: Vec<PlainOutPoint> = Vec::new();
+    pub fn utxos_to_be_locked(&self) -> Vec<OutPoint> {
+        let mut outpoints: Vec<OutPoint> = Vec::new();
         for o in <PayjoinProposal as Into<
             payjoin::receive::v2::Receiver<payjoin::receive::v2::PayjoinProposal>,
         >>::into(self.clone())
         .utxos_to_be_locked()
         {
-            outpoints.push(PlainOutPoint::from(*o));
+            outpoints.push(OutPoint::from(*o));
         }
         outpoints
     }

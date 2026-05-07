@@ -214,8 +214,8 @@ function getInputs(rpcConnection: testUtils.RpcClient): payjoin.InputPair[] {
     const utxos: Utxo[] = JSON.parse(rpcConnection.call("listunspent", []));
     const inputs: payjoin.InputPair[] = [];
     for (const utxo of utxos) {
-        const txin = payjoin.PlainTxIn.create({
-            previousOutput: payjoin.PlainOutPoint.create({
+        const txin = payjoin.TxIn.create({
+            previousOutput: payjoin.OutPoint.create({
                 txid: utxo.txid,
                 vout: utxo.vout,
             }),
@@ -223,11 +223,11 @@ function getInputs(rpcConnection: testUtils.RpcClient): payjoin.InputPair[] {
             sequence: 0,
             witness: [],
         });
-        const txOut = payjoin.PlainTxOut.create({
+        const txOut = payjoin.TxOut.create({
             valueSat: BigInt(Math.round(utxo.amount * 100_000_000)),
             scriptPubkey: Buffer.from(utxo.scriptPubKey, "hex"),
         });
-        const psbtIn = payjoin.PlainPsbtInput.create({
+        const psbtIn = payjoin.PsbtInput.create({
             witnessUtxo: txOut,
             redeemScript: undefined,
             witnessScript: undefined,
@@ -454,8 +454,8 @@ function testFfiValidation(): void {
     const tooLargeAmount = 21000000n * 100000000n + 1n;
 
     // Invalid outpoint (txid too long) should fail before amount checks.
-    const invalidOutpointTxIn = payjoin.PlainTxIn.create({
-        previousOutput: payjoin.PlainOutPoint.create({
+    const invalidOutpointTxIn = payjoin.TxIn.create({
+        previousOutput: payjoin.OutPoint.create({
             txid: "00".repeat(64), // 64 bytes -> invalid
             vout: 0,
         }),
@@ -463,11 +463,11 @@ function testFfiValidation(): void {
         sequence: 0,
         witness: [],
     });
-    const txout = payjoin.PlainTxOut.create({
+    const txout = payjoin.TxOut.create({
         valueSat: tooLargeAmount,
         scriptPubkey: new Uint8Array([0x6a]).buffer,
     });
-    const psbtIn = payjoin.PlainPsbtInput.create({
+    const psbtIn = payjoin.PsbtInput.create({
         witnessUtxo: txout,
         redeemScript: undefined,
         witnessScript: undefined,
@@ -477,8 +477,8 @@ function testFfiValidation(): void {
     }, /InvalidOutPoint/);
 
     // Valid outpoint hits amount overflow validation.
-    const amountOverflowTxIn = payjoin.PlainTxIn.create({
-        previousOutput: payjoin.PlainOutPoint.create({
+    const amountOverflowTxIn = payjoin.TxIn.create({
+        previousOutput: payjoin.OutPoint.create({
             txid: "00".repeat(32), // valid 32-byte txid
             vout: 0,
         }),
@@ -496,11 +496,11 @@ function testFfiValidation(): void {
 
     // Oversized script_pubkey should fail.
     const hugeScript = new Uint8Array(10_001).fill(0x51).buffer;
-    const oversizedTxOut = payjoin.PlainTxOut.create({
+    const oversizedTxOut = payjoin.TxOut.create({
         valueSat: 1n,
         scriptPubkey: hugeScript,
     });
-    const oversizedPsbtIn = payjoin.PlainPsbtInput.create({
+    const oversizedPsbtIn = payjoin.PsbtInput.create({
         witnessUtxo: oversizedTxOut,
         redeemScript: undefined,
         witnessScript: undefined,
@@ -514,11 +514,11 @@ function testFfiValidation(): void {
     }
 
     // Weight must be positive and <= block weight.
-    const smallTxOut = payjoin.PlainTxOut.create({
+    const smallTxOut = payjoin.TxOut.create({
         valueSat: 1n,
         scriptPubkey: new Uint8Array([0x6a]).buffer,
     });
-    const smallPsbtIn = payjoin.PlainPsbtInput.create({
+    const smallPsbtIn = payjoin.PsbtInput.create({
         witnessUtxo: smallTxOut,
         redeemScript: undefined,
         witnessScript: undefined,
@@ -527,7 +527,7 @@ function testFfiValidation(): void {
         new payjoin.InputPair(
             amountOverflowTxIn,
             smallPsbtIn,
-            payjoin.PlainWeight.create({ weightUnits: 0n }),
+            payjoin.Weight.create({ weightUnits: 0n }),
         );
         assert.fail("Expected WeightOutOfRange error");
     } catch (e) {

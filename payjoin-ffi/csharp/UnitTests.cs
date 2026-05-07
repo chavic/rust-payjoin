@@ -370,13 +370,13 @@ public class ValidationTests
     {
         Assert.Throws<InputPairException.InvalidOutPoint>(() =>
         {
-            var txin = new PlainTxIn(
-                new PlainOutPoint("deadbeef", 0),
+            var txin = new TxIn(
+                new OutPoint("deadbeef", 0),
                 new byte[] {},
                 0,
                 new byte[][] {}
             );
-            var psbtIn = new PlainPsbtInput(null, null, null);
+            var psbtIn = new PsbtInput(null, null, null);
             new InputPair(txin, psbtIn, null);
         });
     }
