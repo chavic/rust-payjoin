@@ -61,14 +61,14 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
         too_large_amount = 21_000_000 * 100_000_000 + 1
 
         # Invalid outpoint (txid too long) should fail before amount checks.
-        txin_invalid = PlainTxIn(
-            previous_output=PlainOutPoint(txid="00" * 64, vout=0),
+        txin_invalid = TxIn(
+            previous_output=OutPoint(txid="00" * 64, vout=0),
             script_sig=b"",
             sequence=0,
             witness=[],
         )
-        psbt_in_dummy = PlainPsbtInput(
-            witness_utxo=PlainTxOut(value_sat=1, script_pubkey=bytes([0x6A])),
+        psbt_in_dummy = PsbtInput(
+            witness_utxo=TxOut(value_sat=1, script_pubkey=bytes([0x6A])),
             redeem_script=None,
             witness_script=None,
         )
@@ -76,14 +76,14 @@ class TestPayjoin(unittest.IsolatedAsyncioTestCase):
             InputPair(txin=txin_invalid, psbtin=psbt_in_dummy, expected_weight=None)
 
         # Valid outpoint hits amount overflow validation.
-        txin = PlainTxIn(
-            previous_output=PlainOutPoint(txid="00" * 32, vout=0),
+        txin = TxIn(
+            previous_output=OutPoint(txid="00" * 32, vout=0),
             script_sig=b"",
             sequence=0,
             witness=[],
         )
-        psbt_in = PlainPsbtInput(
-            witness_utxo=PlainTxOut(
+        psbt_in = PsbtInput(
+            witness_utxo=TxOut(
                 value_sat=too_large_amount,
                 script_pubkey=bytes([0x6A]),
             ),
@@ -416,14 +416,14 @@ def get_inputs(rpc_connection: RpcClient) -> list[InputPair]:
         script_pubkey = bytes.fromhex(utxo["scriptPubKey"])
         amount_sat = round(utxo["amount"] * 100_000_000)
 
-        txin = PlainTxIn(
-            previous_output=PlainOutPoint(txid=txid, vout=vout),
+        txin = TxIn(
+            previous_output=OutPoint(txid=txid, vout=vout),
             script_sig=bytes(),
             sequence=0,
             witness=[],
         )
-        witness_utxo = PlainTxOut(value_sat=amount_sat, script_pubkey=script_pubkey)
-        psbt_in = PlainPsbtInput(
+        witness_utxo = TxOut(value_sat=amount_sat, script_pubkey=script_pubkey)
+        psbt_in = PsbtInput(
             witness_utxo=witness_utxo, redeem_script=None, witness_script=None
         )
         inputs.append(InputPair(txin=txin, psbtin=psbt_in, expected_weight=None))

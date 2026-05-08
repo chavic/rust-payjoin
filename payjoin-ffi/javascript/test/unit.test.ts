@@ -486,8 +486,8 @@ describe("Validation", () => {
 
     test("input pair rejects invalid outpoint", () => {
         assert.throws(() => {
-            const txin = payjoin.PlainTxIn.create({
-                previousOutput: payjoin.PlainOutPoint.create({
+            const txin = payjoin.TxIn.create({
+                previousOutput: payjoin.OutPoint.create({
                     txid: "deadbeef",
                     vout: 0,
                 }),
@@ -495,7 +495,7 @@ describe("Validation", () => {
                 sequence: 0,
                 witness: [],
             });
-            const psbtIn = payjoin.PlainPsbtInput.create({
+            const psbtIn = payjoin.PsbtInput.create({
                 witnessUtxo: undefined,
                 redeemScript: undefined,
                 witnessScript: undefined,

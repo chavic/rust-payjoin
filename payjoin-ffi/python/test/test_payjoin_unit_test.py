@@ -333,13 +333,13 @@ class TestValidation(unittest.TestCase):
 
     def test_input_pair_rejects_invalid_outpoint(self):
         with self.assertRaises(payjoin.InputPairError):
-            txin = payjoin.PlainTxIn(
-                previous_output=payjoin.PlainOutPoint(txid="deadbeef", vout=0),
+            txin = payjoin.TxIn(
+                previous_output=payjoin.OutPoint(txid="deadbeef", vout=0),
                 script_sig=bytes(),
                 sequence=0,
                 witness=[],
             )
-            psbtin = payjoin.PlainPsbtInput(
+            psbtin = payjoin.PsbtInput(
                 witness_utxo=None, redeem_script=None, witness_script=None
             )
             payjoin.InputPair(txin, psbtin, None)

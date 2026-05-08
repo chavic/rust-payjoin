@@ -371,9 +371,9 @@ impl SenderBuilder {
     // This method fails if no recommendation can be made or if the PSBT is malformed.
     pub fn build_recommended(
         &self,
-        min_fee_rate: u64,
+        min_fee_rate_sat_per_kwu: u64,
     ) -> Result<InitialSendTransition, SenderInputError> {
-        let fee_rate = validate_fee_rate_sat_per_kwu(min_fee_rate)?;
+        let fee_rate = validate_fee_rate_sat_per_kwu(min_fee_rate_sat_per_kwu)?;
         self.0
             .clone()
             .build_recommended(fee_rate)
@@ -384,7 +384,7 @@ impl SenderBuilder {
     }
     /// Offer the receiver contribution to pay for his input.
     ///
-    /// These parameters will allow the receiver to take `max_fee_contribution` from given change
+    /// These parameters will allow the receiver to take `max_fee_contribution_sats` from given change
     /// output to pay for additional inputs. The recommended fee is `size_of_one_input * fee_rate`.
     ///
     /// `change_index` specifies which output can be used to pay fee. If `None` is provided, then
@@ -397,13 +397,13 @@ impl SenderBuilder {
     /// be just lowered in the request to match the change amount.
     pub fn build_with_additional_fee(
         &self,
-        max_fee_contribution: u64,
+        max_fee_contribution_sats: u64,
         change_index: Option<u8>,
-        min_fee_rate: u64,
+        min_fee_rate_sat_per_kwu: u64,
         clamp_fee_contribution: bool,
     ) -> Result<InitialSendTransition, SenderInputError> {
-        let max_fee_contribution = validate_amount_sat(max_fee_contribution)?;
-        let fee_rate = validate_fee_rate_sat_per_kwu(min_fee_rate)?;
+        let max_fee_contribution = validate_amount_sat(max_fee_contribution_sats)?;
+        let fee_rate = validate_fee_rate_sat_per_kwu(min_fee_rate_sat_per_kwu)?;
         self.0
             .clone()
             .build_with_additional_fee(
@@ -423,9 +423,9 @@ impl SenderBuilder {
     /// This function disables contribution.
     pub fn build_non_incentivizing(
         &self,
-        min_fee_rate: u64,
+        min_fee_rate_sat_per_kwu: u64,
     ) -> Result<InitialSendTransition, SenderInputError> {
-        let fee_rate = validate_fee_rate_sat_per_kwu(min_fee_rate)?;
+        let fee_rate = validate_fee_rate_sat_per_kwu(min_fee_rate_sat_per_kwu)?;
         self.0
             .clone()
             .build_non_incentivizing(fee_rate)

@@ -132,7 +132,7 @@ namespace Payjoin.Tests
 
         private sealed class CheckInputsNotSeenCallback : IsOutputKnown
         {
-            public bool Callback(PlainOutPoint _outpoint) => false;
+            public bool Callback(OutPoint _outpoint) => false;
         }
 
         private sealed class ProcessPsbtCallback : ProcessPsbt
@@ -167,14 +167,14 @@ namespace Payjoin.Tests
                 var amountBtc = utxo.GetProperty("amount").GetDouble();
                 var valueSat = (ulong)Math.Round(amountBtc * 100_000_000.0);
 
-                var txin = new PlainTxIn(
-                    new PlainOutPoint(txid, vout),
+                var txin = new TxIn(
+                    new OutPoint(txid, vout),
                     Array.Empty<byte>(),
                     0,
                     Array.Empty<byte[]>());
 
-                var txout = new PlainTxOut(valueSat, Convert.FromHexString(scriptPubKeyHex));
-                var psbtIn = new PlainPsbtInput(txout, null, null);
+                var txout = new TxOut(valueSat, Convert.FromHexString(scriptPubKeyHex));
+                var psbtIn = new PsbtInput(txout, null, null);
 
                 inputs.Add(new InputPair(txin, psbtIn, null));
             }
@@ -364,14 +364,14 @@ namespace Payjoin.Tests
             var invalidTxid = new string('0', 128);
             Assert.Throws<InputPairException.InvalidOutPoint>(() =>
             {
-                var txin = new PlainTxIn(
-                    new PlainOutPoint(invalidTxid, 0),
+                var txin = new TxIn(
+                    new OutPoint(invalidTxid, 0),
                     Array.Empty<byte>(),
                     0,
                     Array.Empty<byte[]>()
                 );
-                var psbtIn = new PlainPsbtInput(
-                    new PlainTxOut(tooLargeAmount, new byte[] { 0x6a }),
+                var psbtIn = new PsbtInput(
+                    new TxOut(tooLargeAmount, new byte[] { 0x6a }),
                     null,
                     null
                 );
@@ -381,14 +381,14 @@ namespace Payjoin.Tests
             var validTxid = new string('0', 64);
             var amountOutOfRange = Assert.Throws<InputPairException.FfiValidation>(() =>
             {
-                var txin = new PlainTxIn(
-                    new PlainOutPoint(validTxid, 0),
+                var txin = new TxIn(
+                    new OutPoint(validTxid, 0),
                     Array.Empty<byte>(),
                     0,
                     Array.Empty<byte[]>()
                 );
-                var psbtIn = new PlainPsbtInput(
-                    new PlainTxOut(tooLargeAmount, new byte[] { 0x6a }),
+                var psbtIn = new PsbtInput(
+                    new TxOut(tooLargeAmount, new byte[] { 0x6a }),
                     null,
                     null
                 );
@@ -400,14 +400,14 @@ namespace Payjoin.Tests
             Array.Fill(hugeScript, (byte)0x51);
             var scriptTooLarge = Assert.Throws<InputPairException.FfiValidation>(() =>
             {
-                var txin = new PlainTxIn(
-                    new PlainOutPoint(validTxid, 0),
+                var txin = new TxIn(
+                    new OutPoint(validTxid, 0),
                     Array.Empty<byte>(),
                     0,
                     Array.Empty<byte[]>()
                 );
-                var psbtIn = new PlainPsbtInput(
-                    new PlainTxOut(1, hugeScript),
+                var psbtIn = new PsbtInput(
+                    new TxOut(1, hugeScript),
                     null,
                     null
                 );
@@ -417,18 +417,18 @@ namespace Payjoin.Tests
 
             var weightOutOfRange = Assert.Throws<InputPairException.FfiValidation>(() =>
             {
-                var txin = new PlainTxIn(
-                    new PlainOutPoint(validTxid, 0),
+                var txin = new TxIn(
+                    new OutPoint(validTxid, 0),
                     Array.Empty<byte>(),
                     0,
                     Array.Empty<byte[]>()
                 );
-                var psbtIn = new PlainPsbtInput(
-                    new PlainTxOut(1, new byte[] { 0x6a }),
+                var psbtIn = new PsbtInput(
+                    new TxOut(1, new byte[] { 0x6a }),
                     null,
                     null
                 );
-                new InputPair(txin, psbtIn, new PlainWeight(0));
+                new InputPair(txin, psbtIn, new Weight(0));
             });
             Assert.IsType<FfiValidationException.WeightOutOfRange>(weightOutOfRange.v1);
 
