@@ -1,59 +1,13 @@
 import { payjoin, uniffiInitAsync } from "payjoin";
 import * as testUtils from "../test-utils/index.js";
 import assert from "assert";
+import { InMemoryReceiverPersister, InMemorySenderPersister } from "./utils.ts";
 
 interface Utxo {
     txid: string;
     vout: number;
     amount: number;
     scriptPubKey: string;
-}
-
-class InMemoryReceiverPersister
-    implements payjoin.JsonReceiverSessionPersister
-{
-    private id: string;
-    private events: string[] = [];
-    private closed: boolean = false;
-    public connection?: testUtils.RpcClient;
-
-    constructor(id: string) {
-        this.id = id;
-    }
-
-    save(event: string): void {
-        this.events.push(event);
-    }
-
-    load(): string[] {
-        return this.events;
-    }
-
-    close(): void {
-        this.closed = true;
-    }
-}
-
-class InMemorySenderPersister implements payjoin.JsonSenderSessionPersister {
-    private id: string;
-    private events: string[] = [];
-    private closed: boolean = false;
-
-    constructor(id: string) {
-        this.id = id;
-    }
-
-    save(event: string): void {
-        this.events.push(event);
-    }
-
-    load(): string[] {
-        return this.events;
-    }
-
-    close(): void {
-        this.closed = true;
-    }
 }
 
 class MempoolAcceptanceCallback implements payjoin.CanBroadcast {
@@ -343,6 +297,7 @@ async function processUncheckedProposal(
 
 async function retrieveReceiverProposal(
     receiver: payjoin.Initialized,
+    receiverRpc: testUtils.RpcClient,
     recvPersister: InMemoryReceiverPersister,
     ohttpRelay: string,
 ): Promise<payjoin.PayjoinProposal | null> {
@@ -363,7 +318,7 @@ async function retrieveReceiverProposal(
         const proposal = res.inner.inner;
         return await processUncheckedProposal(
             proposal,
-            recvPersister.connection!,
+            receiverRpc,
             recvPersister,
         );
     }
@@ -390,6 +345,7 @@ async function processReceiverProposal(
     if (receiver instanceof payjoin.Initialized) {
         const res = await retrieveReceiverProposal(
             receiver,
+            receiverRpc,
             recvPersister,
             ohttpRelay,
         );
@@ -566,9 +522,8 @@ async function testIntegrationV2ToV2(): Promise<void> {
     const ohttpKeysBytes = services.fetchOhttpKeys();
     const ohttpKeys = payjoin.OhttpKeys.decode(ohttpKeysBytes.buffer);
 
-    const recvPersister = new InMemoryReceiverPersister("1");
-    const senderPersister = new InMemorySenderPersister("1");
-    recvPersister.connection = receiver;
+    const recvPersister = new InMemoryReceiverPersister();
+    const senderPersister = new InMemorySenderPersister();
 
     const session = createReceiverContext(
         receiverAddress,
