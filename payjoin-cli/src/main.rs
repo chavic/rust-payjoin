@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     let config = Config::new(&cli)?;
 
     #[allow(clippy::if_same_then_else)]
-    let app: Box<dyn AppTrait> = if cli.flags.bip78.unwrap_or(false) {
+    let app: Box<dyn AppTrait> = if cli.flags.bip78 {
         #[cfg(feature = "v1")]
         {
             Box::new(crate::app::v1::App::new(config).await?)
@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
                 "BIP78 (v1) support is not enabled in this build. Recompile with --features v1"
             )
         }
-    } else if cli.flags.bip77.unwrap_or(false) {
+    } else if cli.flags.bip77 {
         #[cfg(feature = "v2")]
         {
             Box::new(crate::app::v2::App::new(config).await?)

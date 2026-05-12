@@ -69,12 +69,12 @@ impl Config {
         let mut selected_version = None;
 
         // Check for BIP77 (v2)
-        if cli.flags.bip77.unwrap_or(false) {
+        if cli.flags.bip77 {
             selected_version = Some(Version::Two);
         }
 
         // Check for BIP78 (v1)
-        if cli.flags.bip78.unwrap_or(false) {
+        if cli.flags.bip78 {
             if selected_version.is_some() {
                 return Err(ConfigError::Message(
                     "Multiple version flags specified. Please use only one of: --bip77, --bip78"
