@@ -1176,8 +1176,7 @@ impl Receiver<PayjoinProposal> {
         } else {
             // Prepare v2 wrapped and backwards-compatible v1 payload
             body = self.psbt().to_string().as_bytes().to_vec();
-            let receiver_mailbox =
-                short_id_from_pubkey(self.session_context.receiver_key.public_key());
+            let receiver_mailbox = self.session_context.proposal_mailbox_id();
             target_resource = mailbox_endpoint(&self.session_context.directory, &receiver_mailbox);
             method = "PUT";
         }
