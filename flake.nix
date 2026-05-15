@@ -281,6 +281,7 @@
                 cargo-watch
                 rust-analyzer
                 dart
+                dotnet-sdk_8
                 cargo-fuzz
                 bzip2 # needed for some machines to have access to libzip at runtime
                 codespell
