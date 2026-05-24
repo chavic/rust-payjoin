@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>true</IsPackable>
+    <PackageId>Payjoin</PackageId>
+    <Version>0.24.0-preview.1</Version>
+    <Title>Payjoin</Title>
+    <Authors>Payjoin Dev Kit Contributors</Authors>
+    <Description>C# bindings for payjoin-ffi, generated from rust-payjoin via UniFFI.</Description>
+    <PackageTags>bitcoin;payjoin;bip78;ffi;csharp;dotnet</PackageTags>
+    <PackageProjectUrl>https://github.com/payjoin/rust-payjoin</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/payjoin/rust-payjoin</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT OR Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <NoWarn>$(NoWarn);CS0108;CS0659</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src/**/*.cs" />
+    <Compile Include="Payjoin.Http.cs" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="$(TargetPath)" Pack="true" PackagePath="ref/$(TargetFramework)/" />
+    <None Include="$(TargetPath)" Pack="true" PackagePath="runtimes/any/lib/$(TargetFramework)/" />
+    <None Include="artifacts/runtimes/linux-x64/native/*" Pack="true" PackagePath="runtimes/linux-x64/native/" />
+    <None Include="artifacts/runtimes/osx-x64/native/*" Pack="true" PackagePath="runtimes/osx-x64/native/" />
+    <None Include="artifacts/runtimes/win-x64/native/*" Pack="true" PackagePath="runtimes/win-x64/native/" />
+  </ItemGroup>
+
+  <Target Name="ValidatePayjoinNativeAssets" BeforeTargets="Pack">
+    <ItemGroup>
+      <PayjoinNativeAsset Include="artifacts/runtimes/**/native/*" />
+    </ItemGroup>
+    <Error
+      Condition="'@(PayjoinNativeAsset)' == ''"
+      Text="No RID-specific native assets found. Run scripts/build_nuget_native.sh or scripts/build_nuget_native.ps1 before packing." />
+    <Error
+      Condition="Exists('src/payjoin.cs') and $([System.IO.File]::ReadAllText('src/payjoin.cs').Contains('OriginalPsbt'))"
+      Text="Generated bindings include _test-utils. Regenerate with PAYJOIN_FFI_FEATURES= before packing." />
+  </Target>
+
+</Project>
