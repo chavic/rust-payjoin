@@ -40,9 +40,7 @@ jobs:
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            10.0.x
-            8.0.x
+          dotnet-version: "10.0.x"
 
       - name: Verify .NET SDK
         run: |
@@ -100,9 +98,7 @@ jobs:
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            10.0.x
-            8.0.x
+          dotnet-version: "10.0.x"
 
       - name: Download native assets
         uses: actions/download-artifact@v4
@@ -155,9 +151,7 @@ jobs:
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            10.0.x
-            8.0.x
+          dotnet-version: "10.0.x"
 
       - name: Download NuGet package
         uses: actions/download-artifact@v4

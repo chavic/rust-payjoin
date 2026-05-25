@@ -4,7 +4,7 @@ C# bindings for the [Payjoin Dev Kit](https://payjoindevkit.org/), generated fro
 `payjoin-ffi` with UniFFI.
 
 The NuGet package is still prepared as a preview while the C# API stabilizes. The
-first release-ready package layout targets .NET 8 and ships a managed
+first release-ready package layout targets .NET 10 and ships a managed
 `Payjoin.dll` plus RID-specific native `payjoin_ffi` libraries.
 
 ## Install
@@ -15,21 +15,21 @@ dotnet add package Payjoin --prerelease
 
 ## Requirements
 
-- .NET 8.0 or higher
+- .NET 10.0 or higher
 - A supported RID native asset in the package
 
 The first preview release matrix is:
 
-| OS | RID | Native library |
-| --- | --- | --- |
-| Linux x64 | `linux-x64` | `libpayjoin_ffi.so` |
-| macOS x64 | `osx-x64` | `libpayjoin_ffi.dylib` |
-| Windows x64 | `win-x64` | `payjoin_ffi.dll` |
+| OS          | RID         | Native library         |
+| ----------- | ----------- | ---------------------- |
+| Linux x64   | `linux-x64` | `libpayjoin_ffi.so`    |
+| macOS x64   | `osx-x64`   | `libpayjoin_ffi.dylib` |
+| Windows x64 | `win-x64`   | `payjoin_ffi.dll`      |
 
 The package follows the .NET native asset layout:
 
-- `ref/net8.0/Payjoin.dll`
-- `runtimes/any/lib/net8.0/Payjoin.dll`
+- `ref/net10.0/Payjoin.dll`
+- `runtimes/any/lib/net10.0/Payjoin.dll`
 - `runtimes/{rid}/native/{native-library}`
 
 ## Minimal Usage
@@ -43,8 +43,8 @@ Console.WriteLine(uri.AsString());
 
 ## Development
 
-With nix, the default development shell provides the Rust toolchain, .NET 10 SDK,
-and .NET 8 runtime:
+With nix, the default development shell provides the Rust toolchain and .NET 10
+SDK:
 
 ```shell
 nix develop -c bash payjoin-ffi/csharp/contrib/test.sh

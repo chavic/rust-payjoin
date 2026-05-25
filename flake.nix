@@ -274,7 +274,6 @@
 
         dotnetSdk = pkgs.dotnetCorePackages.combinePackages [
           pkgs.dotnetCorePackages.sdk_10_0
-          pkgs.dotnetCorePackages.runtime_8_0
         ];
 
         devShells = builtins.mapAttrs (

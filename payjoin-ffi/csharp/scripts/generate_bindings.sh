@@ -23,11 +23,7 @@ cd "$SCRIPT_DIR/../.."
 
 echo "Generating payjoin C#..."
 # Keep parity with other language test scripts: include _test-utils by default.
-if [[ ${PAYJOIN_FFI_FEATURES+x} ]]; then
-    PAYJOIN_FFI_FEATURES=${PAYJOIN_FFI_FEATURES}
-else
-    PAYJOIN_FFI_FEATURES=_test-utils
-fi
+PAYJOIN_FFI_FEATURES=${PAYJOIN_FFI_FEATURES-_test-utils}
 PAYJOIN_FFI_PROFILE=${PAYJOIN_FFI_PROFILE:-dev}
 if [[ $PAYJOIN_FFI_PROFILE == "dev" ]]; then
     TARGET_PROFILE_DIR=debug
@@ -48,12 +44,12 @@ rm -f csharp/src/*.cs
 
 # Use the Cargo-managed C# generator pinned in payjoin-ffi/Cargo.toml.
 UNIFFI_BINDGEN_LANGUAGE=csharp cargo run --features "$GENERATOR_FEATURES" --profile dev --bin uniffi-bindgen -- \
-    --library ../target/$TARGET_PROFILE_DIR/$LIBNAME \
+    --library "../target/$TARGET_PROFILE_DIR/$LIBNAME" \
     --out-dir csharp/src/
 
 # Copy native library to csharp/lib/ directory for testing
 echo "Copying native library..."
 mkdir -p csharp/lib
-cp ../target/$TARGET_PROFILE_DIR/$LIBNAME csharp/lib/$LIBNAME
+cp "../target/$TARGET_PROFILE_DIR/$LIBNAME" "csharp/lib/$LIBNAME"
 
 echo "All done!"
