@@ -4,6 +4,9 @@ set -e
 source contrib/lockfile.sh
 use_lockfile Cargo-recent.lock
 
+# READMEs must carry the shared payjoin concept text verbatim
+bash payjoin-ffi/contrib/sync-concept.sh --check
+
 # Run clippy at top level for crates without feature-specific checks
 echo "Running workspace lint..."
 cargo clippy --locked --all-targets --keep-going --all-features -- -D warnings
